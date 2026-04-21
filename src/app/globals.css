@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+    /* Techbridge-inspired palette */
+    --background: #eef1f4;
+    --foreground: #0f172a;
+    --muted: #f8fafc;
+    --muted-foreground: #64748b;
+    --border: #e2e8f0;
+
+    --surface: #ffffff;
+    --surface-foreground: #0f172a;
+
+    --sidebar: #ffffff;
+    --sidebar-foreground: #475569;
+    --sidebar-active: #0f172a;
+    --sidebar-active-foreground: #ffffff;
+
+    --header: #334155;
+    --header-foreground: #f1f5f9;
+
+    --auth-background: #475569;
+    --auth-card: #334155;
+    --auth-card-foreground: #f1f5f9;
+    --auth-input: #475569;
+    --auth-input-foreground: #f1f5f9;
+    --auth-input-border: #64748b;
+    --auth-muted: #94a3b8;
+
+    --primary: #0f172a;
+    --primary-foreground: #f8fafc;
+    --accent: #ffffff;
+    --accent-foreground: #0f172a;
+
+    --destructive: #dc2626;
+    --destructive-foreground: #fef2f2;
+
+    --ring: #64748b;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-border: var(--border);
+    --color-surface: var(--surface);
+    --color-surface-foreground: var(--surface-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-active: var(--sidebar-active);
+    --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+    --color-header: var(--header);
+    --color-header-foreground: var(--header-foreground);
+    --color-auth-background: var(--auth-background);
+    --color-auth-card: var(--auth-card);
+    --color-auth-card-foreground: var(--auth-card-foreground);
+    --color-auth-input: var(--auth-input);
+    --color-auth-input-foreground: var(--auth-input-foreground);
+    --color-auth-input-border: var(--auth-input-border);
+    --color-auth-muted: var(--auth-muted);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-ring: var(--ring);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
