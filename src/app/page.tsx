@@ -11,6 +11,11 @@ import { BillDetailModal } from "./bills/bill-detail-modal";
 import { FlashToast } from "./bills/flash-toast";
 import { DashboardCalendar, type CalendarBill } from "./dashboard-calendar";
 
+// The dashboard aggregates `bill_stats()` and the month's bills; it must
+// reflect edits/deletes immediately, not serve a prefetched/stale RSC payload
+// from the router cache after the user edits a bill on /bills/[id]/edit.
+export const dynamic = "force-dynamic";
+
 const monthSchema = z
     .string()
     .regex(/^\d{4}-\d{2}$/)
@@ -29,6 +34,7 @@ type RecentBill = {
     id: string;
     bill_no: string;
     customer_name: string;
+    customer_phone: string | null;
     bill_date: string;
     total_amount: string;
     received_amount: string;
@@ -71,7 +77,7 @@ export default async function DashboardPage({
         supabase
             .from("bills")
             .select(
-                "id, bill_no, customer_name, bill_date, total_amount, received_amount, status",
+                "id, bill_no, customer_name, customer_phone, bill_date, total_amount, received_amount, status",
             )
             .gte("bill_date", fromDate)
             .lt("bill_date", toDate)
@@ -80,7 +86,7 @@ export default async function DashboardPage({
         supabase
             .from("bills")
             .select(
-                "id, bill_no, customer_name, bill_date, total_amount, received_amount, status",
+                "id, bill_no, customer_name, customer_phone, bill_date, total_amount, received_amount, status",
             )
             .order("created_at", { ascending: false })
             .limit(6),

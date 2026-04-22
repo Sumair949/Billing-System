@@ -58,7 +58,7 @@ export function CustomerBillsModal({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     {isPending ? (
                         <div className="py-12 text-center text-sm text-muted-foreground">
                             Loading bills…
@@ -80,7 +80,7 @@ export function CustomerBillsModal({
                                         key={bill.id}
                                         className="overflow-hidden rounded-lg ring-1 ring-border"
                                     >
-                                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-3">
                                             <div className="flex flex-wrap items-center gap-2.5">
                                                 <span className="font-mono text-sm font-bold text-foreground">
                                                     {bill.bill_no}
@@ -105,7 +105,8 @@ export function CustomerBillsModal({
                                             </Link>
                                         </div>
 
-                                        <table className="w-full text-sm">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[560px] text-sm">
                                             <thead className="border-b border-border bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
                                                 <tr>
                                                     <th className="px-4 py-2.5 text-left font-semibold">
@@ -116,6 +117,9 @@ export function CustomerBillsModal({
                                                     </th>
                                                     <th className="px-4 py-2.5 text-right font-semibold">
                                                         Qty
+                                                    </th>
+                                                    <th className="px-4 py-2.5 text-right font-semibold">
+                                                        Weight
                                                     </th>
                                                     <th className="px-4 py-2.5 text-right font-semibold">
                                                         Rate
@@ -140,6 +144,9 @@ export function CustomerBillsModal({
                                                         <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                                             {item.quantity}
                                                         </td>
+                                                        <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
+                                                            {item.weight ?? "—"}
+                                                        </td>
                                                         <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                                             {formatAmount(item.rate)}
                                                         </td>
@@ -151,7 +158,7 @@ export function CustomerBillsModal({
                                             </tbody>
                                             <tfoot className="border-t-2 border-border bg-muted/30">
                                                 <tr>
-                                                    <td colSpan={3} />
+                                                    <td colSpan={4} />
                                                     <td className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
                                                         Total
                                                     </td>
@@ -162,7 +169,7 @@ export function CustomerBillsModal({
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td colSpan={3} />
+                                                    <td colSpan={4} />
                                                     <td className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
                                                         Received
                                                     </td>
@@ -174,7 +181,7 @@ export function CustomerBillsModal({
                                                 </tr>
                                                 {pending > 0 ? (
                                                     <tr>
-                                                        <td colSpan={3} />
+                                                        <td colSpan={4} />
                                                         <td className="px-4 py-2.5 text-right text-xs font-semibold text-amber-700">
                                                             Pending
                                                         </td>
@@ -185,6 +192,7 @@ export function CustomerBillsModal({
                                                 ) : null}
                                             </tfoot>
                                         </table>
+                                        </div>
                                     </div>
                                 );
                             })}

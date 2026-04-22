@@ -12,6 +12,7 @@ export type CustomerBill = {
         sr_no: number;
         description: string;
         quantity: string;
+        weight: string | null;
         rate: string;
         amount: string;
     }[];
@@ -34,7 +35,7 @@ export async function getCustomerBillsAction(
     const billIds = bills.map((b) => b.id);
     const { data: allItems } = await supabase
         .from("bill_items")
-        .select("bill_id, sr_no, description, quantity, rate, amount")
+        .select("bill_id, sr_no, description, quantity, weight, rate, amount")
         .in("bill_id", billIds)
         .order("bill_id")
         .order("sr_no");
@@ -49,6 +50,7 @@ export async function getCustomerBillsAction(
             sr_no: item.sr_no,
             description: item.description,
             quantity: item.quantity,
+            weight: item.weight,
             rate: item.rate,
             amount: item.amount,
         });

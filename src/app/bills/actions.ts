@@ -8,7 +8,15 @@ import { billSchema } from "@/lib/validation/bill";
 export type BillFormState = {
     error?: string;
     fieldErrors?: Partial<
-        Record<"customer_name" | "bill_date" | "received_amount" | "items", string>
+        Record<
+            | "customer_name"
+            | "customer_phone"
+            | "bill_date"
+            | "received_amount"
+            | "total_amount"
+            | "items",
+            string
+        >
     >;
 };
 
@@ -25,7 +33,9 @@ function parseBillFormData(formData: FormData) {
 
     return billSchema.safeParse({
         customer_name: formData.get("customer_name"),
+        customer_phone: formData.get("customer_phone"),
         bill_date: formData.get("bill_date"),
+        total_amount: formData.get("total_amount"),
         received_amount: formData.get("received_amount"),
         items,
     });
@@ -75,7 +85,9 @@ export async function createBillAction(
         .insert({
             user_id: user.id,
             customer_name: parsed.data.customer_name,
+            customer_phone: parsed.data.customer_phone ?? null,
             bill_date: parsed.data.bill_date,
+            total_amount: parsed.data.total_amount,
             received_amount: parsed.data.received_amount,
         })
         .select("id")
@@ -93,6 +105,7 @@ export async function createBillAction(
             sr_no: i + 1,
             description: item.description,
             quantity: item.quantity,
+            weight: item.weight ?? null,
             rate: item.rate,
         })),
     );
@@ -129,7 +142,9 @@ export async function updateBillAction(
         .from("bills")
         .update({
             customer_name: parsed.data.customer_name,
+            customer_phone: parsed.data.customer_phone ?? null,
             bill_date: parsed.data.bill_date,
+            total_amount: parsed.data.total_amount,
             received_amount: parsed.data.received_amount,
         })
         .eq("id", id);
@@ -157,6 +172,7 @@ export async function updateBillAction(
             sr_no: i + 1,
             description: item.description,
             quantity: item.quantity,
+            weight: item.weight ?? null,
             rate: item.rate,
         })),
     );
@@ -186,6 +202,7 @@ export async function deleteBillAction(id: string) {
         throw new Error("Could not delete the bill.");
     }
 
+    revalidatePath("/");
     revalidatePath("/bills");
     revalidatePath("/pendings");
     redirect("/bills?flash=bill-deleted");
@@ -195,6 +212,7 @@ export type BillItemRow = {
     sr_no: number;
     description: string;
     quantity: string;
+    weight: string | null;
     rate: string;
     amount: string;
 };
@@ -203,7 +221,7 @@ export async function getBillItemsAction(billId: string): Promise<BillItemRow[]>
     const { supabase } = await requireUser();
     const { data } = await supabase
         .from("bill_items")
-        .select("sr_no, description, quantity, rate, amount")
+        .select("sr_no, description, quantity, weight, rate, amount")
         .eq("bill_id", billId)
         .order("sr_no");
     return (data ?? []) as BillItemRow[];

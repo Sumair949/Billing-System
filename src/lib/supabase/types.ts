@@ -5,6 +5,7 @@ export type Bill = {
     user_id: string;
     bill_no: string;
     customer_name: string;
+    customer_phone: string | null;
     bill_date: string;
     received_amount: string;
     total_amount: string;
@@ -20,6 +21,7 @@ export type BillItem = {
     sr_no: number;
     description: string;
     quantity: string;
+    weight: string | null;
     rate: string;
     amount: string;
     created_at: string;
@@ -37,10 +39,7 @@ export type BillInsert = Omit<
 };
 
 export type BillUpdate = Partial<
-    Omit<
-        Bill,
-        "id" | "user_id" | "total_amount" | "status" | "created_at" | "updated_at"
-    >
+    Omit<Bill, "id" | "user_id" | "status" | "created_at" | "updated_at">
 >;
 
 export type BillItemInsert = Omit<BillItem, "id" | "amount" | "created_at">;

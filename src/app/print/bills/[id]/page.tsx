@@ -7,6 +7,7 @@ type ItemRow = {
     sr_no: number;
     description: string;
     quantity: string;
+    weight: string | null;
     rate: string;
     amount: string;
 };
@@ -28,13 +29,13 @@ export default async function PrintBillPage({
         supabase
             .from("bills")
             .select(
-                "id, bill_no, customer_name, bill_date, total_amount, received_amount",
+                "id, bill_no, customer_name, customer_phone, bill_date, total_amount, received_amount",
             )
             .eq("id", id)
             .maybeSingle(),
         supabase
             .from("bill_items")
-            .select("sr_no, description, quantity, rate, amount")
+            .select("sr_no, description, quantity, weight, rate, amount")
             .eq("bill_id", id)
             .order("sr_no", { ascending: true }),
         supabase.auth.getUser(),
@@ -90,6 +91,11 @@ export default async function PrintBillPage({
                             <p className="mt-1.5 text-base font-semibold">
                                 {bill.customer_name}
                             </p>
+                            {bill.customer_phone ? (
+                                <p className="mt-1 font-mono text-sm text-gray-600">
+                                    {bill.customer_phone}
+                                </p>
+                            ) : null}
                         </div>
                         <div className="text-right">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
@@ -108,13 +114,16 @@ export default async function PrintBillPage({
                                 <th className="py-2.5 font-semibold">
                                     Description
                                 </th>
-                                <th className="w-20 py-2.5 text-right font-semibold">
+                                <th className="w-16 py-2.5 text-right font-semibold">
                                     Qty
                                 </th>
-                                <th className="w-28 py-2.5 text-right font-semibold">
+                                <th className="w-24 py-2.5 text-right font-semibold">
+                                    Weight
+                                </th>
+                                <th className="w-24 py-2.5 text-right font-semibold">
                                     Rate
                                 </th>
-                                <th className="w-32 py-2.5 text-right font-semibold">
+                                <th className="w-28 py-2.5 text-right font-semibold">
                                     Amount
                                 </th>
                             </tr>
@@ -133,6 +142,9 @@ export default async function PrintBillPage({
                                     </td>
                                     <td className="py-3 text-right font-mono">
                                         {item.quantity}
+                                    </td>
+                                    <td className="py-3 text-right font-mono text-gray-600">
+                                        {item.weight ?? "—"}
                                     </td>
                                     <td className="py-3 text-right font-mono">
                                         {formatAmountPlain(item.rate)}

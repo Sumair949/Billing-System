@@ -17,12 +17,14 @@ export default async function EditBillPage({
     const [billRes, itemsRes] = await Promise.all([
         supabase
             .from("bills")
-            .select("id, bill_no, customer_name, bill_date, received_amount")
+            .select(
+                "id, bill_no, customer_name, customer_phone, bill_date, total_amount, received_amount",
+            )
             .eq("id", id)
             .maybeSingle(),
         supabase
             .from("bill_items")
-            .select("sr_no, description, quantity, rate")
+            .select("sr_no, description, quantity, weight, rate")
             .eq("bill_id", id)
             .order("sr_no", { ascending: true }),
     ]);
@@ -35,6 +37,7 @@ export default async function EditBillPage({
     const items = (itemsRes.data ?? []).map((it) => ({
         description: it.description,
         quantity: String(it.quantity),
+        weight: it.weight != null ? String(it.weight) : "",
         rate: String(it.rate),
     }));
 
@@ -69,7 +72,9 @@ export default async function EditBillPage({
                 submitLabel="Save changes"
                 defaultValues={{
                     customer_name: bill.customer_name,
+                    customer_phone: bill.customer_phone ?? "",
                     bill_date: bill.bill_date,
+                    total_amount: String(bill.total_amount),
                     received_amount: String(bill.received_amount),
                     items,
                 }}

@@ -30,6 +30,7 @@ type BillRow = Pick<
     | "id"
     | "bill_no"
     | "customer_name"
+    | "customer_phone"
     | "bill_date"
     | "total_amount"
     | "received_amount"
@@ -89,7 +90,7 @@ export default async function BillsPage({
     let listQuery = supabase
         .from("bills")
         .select(
-            "id, bill_no, customer_name, bill_date, total_amount, received_amount, status, created_at",
+            "id, bill_no, customer_name, customer_phone, bill_date, total_amount, received_amount, status, created_at",
             { count: "exact" },
         );
 

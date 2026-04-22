@@ -19,6 +19,7 @@ export type CalendarBill = {
     id: string;
     bill_no: string;
     customer_name: string;
+    customer_phone: string | null;
     bill_date: string;
     total_amount: string;
     received_amount: string;
