@@ -1,4 +1,5 @@
 import { Users, Wallet } from "lucide-react";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatAmount } from "@/lib/format";
 import { CustomerBillsModal } from "./customer-bills-modal";
@@ -159,7 +160,7 @@ export default async function PendingsPage({
                                         Pending
                                     </th>
                                     <th className="px-6 py-3.5 text-right font-semibold">
-                                        View
+                                        Actions
                                     </th>
                                 </tr>
                             </thead>
@@ -205,10 +206,23 @@ export default async function PendingsPage({
                                             {formatAmount(r.pending_amount)}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <CustomerBillsModal
-                                                customerName={r.customer_name}
-                                                pendingAmount={formatAmount(r.pending_amount)}
-                                            />
+                                            <div className="flex items-center justify-end gap-3">
+                                                <CustomerBillsModal
+                                                    customerName={r.customer_name}
+                                                    pendingAmount={formatAmount(r.pending_amount)}
+                                                />
+                                                <Link
+                                                    href={`/print/ledger/${encodeURIComponent(r.customer_name)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
+                                                >
+                                                    <svg className="h-3.5 w-3.5" aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" />
+                                                    </svg>
+                                                    Ledger
+                                                </Link>
+                                            </div>
                                         </td>
                                     </tr>
                                     );

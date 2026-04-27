@@ -122,11 +122,13 @@ export const billItemSchema = z.object({
         max: 999_999_999,
         label: "Quantity",
     }),
-    weight: optionalDecimalSchema({
-        maxDecimals: 3,
-        max: 999_999_999,
-        label: "Weight",
-    }),
+    weight: z
+        .union([z.string(), z.null(), z.undefined()])
+        .transform((v) => {
+            if (v === null || v === undefined) return undefined;
+            const s = v.trim();
+            return s === "" ? undefined : s;
+        }),
     rate: decimalSchema({ maxDecimals: 2, label: "Rate" }),
 });
 

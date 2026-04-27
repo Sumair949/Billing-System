@@ -257,7 +257,6 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
                                         <td className="px-2 py-2">
                                             <Input
                                                 type="text"
-                                                inputMode="decimal"
                                                 placeholder="—"
                                                 value={item.weight}
                                                 onChange={(e) =>
