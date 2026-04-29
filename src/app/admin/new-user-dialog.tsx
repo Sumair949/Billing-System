@@ -74,6 +74,51 @@ export function NewUserDialog() {
                         </div>
 
                         <div className="space-y-2">
+                            <Label htmlFor="new-user-address">Shop address</Label>
+                            <Input
+                                id="new-user-address"
+                                name="shop_address"
+                                type="text"
+                                maxLength={500}
+                                placeholder="Street, city — shown on printed invoices"
+                                aria-invalid={
+                                    state.fieldErrors?.shop_address ? true : undefined
+                                }
+                            />
+                            <FieldError message={state.fieldErrors?.shop_address} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="new-user-phone">Shop phone</Label>
+                            <Input
+                                id="new-user-phone"
+                                name="shop_phone"
+                                type="tel"
+                                maxLength={50}
+                                placeholder="0300-1234567"
+                                aria-invalid={
+                                    state.fieldErrors?.shop_phone ? true : undefined
+                                }
+                            />
+                            <FieldError message={state.fieldErrors?.shop_phone} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="new-user-shop-email">Shop email</Label>
+                            <Input
+                                id="new-user-shop-email"
+                                name="shop_email"
+                                type="email"
+                                maxLength={200}
+                                placeholder="shop@example.com"
+                                aria-invalid={
+                                    state.fieldErrors?.shop_email ? true : undefined
+                                }
+                            />
+                            <FieldError message={state.fieldErrors?.shop_email} />
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="new-user-email">Email</Label>
                             <Input
                                 id="new-user-email"

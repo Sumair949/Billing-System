@@ -1,10 +1,12 @@
 "use client";
 
 import {
+    CreditCard,
     LayoutDashboard,
     Menu,
     Receipt,
     ShieldCheck,
+    ShoppingCart,
     Wallet,
     X,
 } from "lucide-react";
@@ -83,8 +85,22 @@ export function MobileNav({ admin }: { admin: boolean }) {
                             <li>
                                 <NavLink
                                     href="/pendings"
-                                    label="Pendings"
+                                    label="Receivables"
                                     icon={<Wallet className="h-5 w-5" />}
+                                />
+                            </li>
+                            <li>
+                                <NavLink
+                                    href="/purchases"
+                                    label="Purchases"
+                                    icon={<ShoppingCart className="h-5 w-5" />}
+                                />
+                            </li>
+                            <li>
+                                <NavLink
+                                    href="/payables"
+                                    label="Payables"
+                                    icon={<CreditCard className="h-5 w-5" />}
                                 />
                             </li>
                             {admin ? (

@@ -13,7 +13,7 @@ type ItemRow = {
     amount: string;
 };
 
-export default async function PrintBillPage({
+export default async function PrintPurchasePage({
     params,
 }: {
     params: Promise<{ id: string }>;
@@ -21,37 +21,37 @@ export default async function PrintBillPage({
     const { id } = await params;
     const supabase = await createSupabaseServerClient();
 
-    const [billRes, itemsRes, userRes] = await Promise.all([
+    const [purchaseRes, itemsRes, userRes] = await Promise.all([
         supabase
-            .from("bills")
+            .from("purchases")
             .select(
-                "id, bill_no, customer_name, customer_phone, address, email, ntn, stn, bill_date, total_amount, received_amount, freight_charges, loading_charges, discount, prepared_by, approved_by",
+                "id, purchase_no, supplier_name, purchase_date, total_amount, paid_amount, freight_charges, loading_charges, discount, prepared_by, approved_by",
             )
             .eq("id", id)
             .maybeSingle(),
         supabase
-            .from("bill_items")
+            .from("purchase_items")
             .select("sr_no, description, quantity, weight, rate, amount")
-            .eq("bill_id", id)
+            .eq("purchase_id", id)
             .order("sr_no", { ascending: true }),
         supabase.auth.getUser(),
     ]);
 
-    if (billRes.error || !billRes.data) notFound();
+    if (purchaseRes.error || !purchaseRes.data) notFound();
 
-    const bill = billRes.data;
+    const purchase = purchaseRes.data;
     const items = (itemsRes.data ?? []) as ItemRow[];
     const shop = readShopInfo(userRes.data.user?.user_metadata);
-    const pending = Math.max(
+    const payable = Math.max(
         0,
-        Number(bill.total_amount) - Number(bill.received_amount),
+        Number(purchase.total_amount) - Number(purchase.paid_amount),
     );
 
     const freightLoadingCharges =
-        Number(bill.freight_charges ?? 0) + Number(bill.loading_charges ?? 0);
-    const discountAmt = Number(bill.discount ?? 0);
+        Number(purchase.freight_charges ?? 0) + Number(purchase.loading_charges ?? 0);
+    const discountAmt = Number(purchase.discount ?? 0);
     const subtotal =
-        Number(bill.total_amount) - freightLoadingCharges + discountAmt;
+        Number(purchase.total_amount) - freightLoadingCharges + discountAmt;
 
     return (
         <div className="min-h-screen bg-gray-100 py-8 print:bg-white print:py-0">
@@ -85,65 +85,34 @@ export default async function PrintBillPage({
                                     {shop.email}
                                 </p>
                             ) : null}
-                            <p className="mt-0.5 text-xs text-gray-500">Billing Statement</p>
+                            <p className="mt-0.5 text-xs text-gray-500">Purchase Record</p>
                         </div>
                         <div className="text-right">
                             <p className="text-base font-bold uppercase tracking-widest text-gray-700">
-                                Invoice
+                                Purchase
                             </p>
                             <p className="mt-0.5 font-mono text-sm font-semibold">
-                                {bill.bill_no}
+                                {purchase.purchase_no}
                             </p>
                         </div>
                     </header>
 
-                    {/* Customer + Date */}
+                    {/* Supplier + Date */}
                     <section className="grid grid-cols-2 gap-6 border-b border-gray-200 py-4">
                         <div>
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Billed to
+                                Supplier
                             </p>
                             <p className="mt-1 text-sm font-semibold">
-                                <span className="text-gray-500">Name: </span>
-                                {bill.customer_name}
+                                {purchase.supplier_name}
                             </p>
-                            {bill.customer_phone ? (
-                                <p className="mt-0.5 text-xs text-gray-700">
-                                    <span className="text-gray-500">Phone: </span>
-                                    <span className="font-mono">{bill.customer_phone}</span>
-                                </p>
-                            ) : null}
-                            {bill.address ? (
-                                <p className="mt-0.5 text-xs text-gray-700">
-                                    <span className="text-gray-500">Address: </span>
-                                    {bill.address}
-                                </p>
-                            ) : null}
-                            {bill.email ? (
-                                <p className="mt-0.5 text-xs text-gray-700">
-                                    <span className="text-gray-500">Email: </span>
-                                    {bill.email}
-                                </p>
-                            ) : null}
-                            {bill.ntn ? (
-                                <p className="mt-0.5 text-xs text-gray-700">
-                                    <span className="text-gray-500">NTN: </span>
-                                    {bill.ntn}
-                                </p>
-                            ) : null}
-                            {bill.stn ? (
-                                <p className="mt-0.5 text-xs text-gray-700">
-                                    <span className="text-gray-500">STN: </span>
-                                    {bill.stn}
-                                </p>
-                            ) : null}
                         </div>
                         <div className="text-right">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Bill date
+                                Purchase date
                             </p>
                             <p className="mt-1 text-sm font-semibold">
-                                {formatDate(bill.bill_date)}
+                                {formatDate(purchase.purchase_date)}
                             </p>
                         </div>
                     </section>
@@ -152,7 +121,7 @@ export default async function PrintBillPage({
                     <table className="mt-4 w-full border-collapse text-xs">
                         <thead>
                             <tr className="border-b-2 border-gray-900 text-left text-[10px] uppercase tracking-wider text-gray-600">
-                                <th className="w-10 py-2 font-semibold">SR #</th>
+                                <th className="w-12 py-2 font-semibold">Sr#</th>
                                 <th className="py-2 font-semibold">Description</th>
                                 <th className="w-14 py-2 text-right font-semibold">Qty</th>
                                 <th className="w-14 py-2 text-right font-semibold">Wt.</th>
@@ -211,25 +180,25 @@ export default async function PrintBillPage({
                             <div className="flex justify-between border-b border-gray-200 py-1.5">
                                 <dt className="font-semibold">Total</dt>
                                 <dd className="font-mono font-semibold">
-                                    {CURRENCY_SYMBOL} {formatAmountPlain(bill.total_amount)}
+                                    {CURRENCY_SYMBOL} {formatAmountPlain(purchase.total_amount)}
                                 </dd>
                             </div>
                             <div className="flex justify-between py-1.5">
-                                <dt className="text-gray-600">Received</dt>
+                                <dt className="text-gray-600">Paid</dt>
                                 <dd className="font-mono">
-                                    {CURRENCY_SYMBOL} {formatAmountPlain(bill.received_amount)}
+                                    {CURRENCY_SYMBOL} {formatAmountPlain(purchase.paid_amount)}
                                 </dd>
                             </div>
                             <div
                                 className={`flex justify-between py-2 ${
-                                    pending > 0
+                                    payable > 0
                                         ? "border-t-2 border-gray-900 text-sm font-bold"
                                         : "border-t border-gray-200"
                                 }`}
                             >
-                                <dt>{pending > 0 ? "Balance due" : "Paid"}</dt>
+                                <dt>{payable > 0 ? "Balance due" : "Paid"}</dt>
                                 <dd className="font-mono">
-                                    {CURRENCY_SYMBOL} {formatAmountPlain(pending)}
+                                    {CURRENCY_SYMBOL} {formatAmountPlain(payable)}
                                 </dd>
                             </div>
                         </dl>
@@ -245,9 +214,9 @@ export default async function PrintBillPage({
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                                 Prepared by
                             </p>
-                            {bill.prepared_by ? (
+                            {purchase.prepared_by ? (
                                 <p className="mt-0.5 text-xs font-medium text-gray-700">
-                                    {bill.prepared_by}
+                                    {purchase.prepared_by}
                                 </p>
                             ) : null}
                         </div>
@@ -256,9 +225,9 @@ export default async function PrintBillPage({
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                                 Approved by
                             </p>
-                            {bill.approved_by ? (
+                            {purchase.approved_by ? (
                                 <p className="mt-0.5 text-xs font-medium text-gray-700">
-                                    {bill.approved_by}
+                                    {purchase.approved_by}
                                 </p>
                             ) : null}
                         </div>

@@ -11,9 +11,18 @@ export type BillFormState = {
         Record<
             | "customer_name"
             | "customer_phone"
+            | "address"
+            | "email"
+            | "ntn"
+            | "stn"
             | "bill_date"
             | "received_amount"
             | "total_amount"
+            | "freight_charges"
+            | "loading_charges"
+            | "discount"
+            | "prepared_by"
+            | "approved_by"
             | "items",
             string
         >
@@ -34,9 +43,18 @@ function parseBillFormData(formData: FormData) {
     return billSchema.safeParse({
         customer_name: formData.get("customer_name"),
         customer_phone: formData.get("customer_phone"),
+        address: formData.get("address"),
+        email: formData.get("email"),
+        ntn: formData.get("ntn"),
+        stn: formData.get("stn"),
         bill_date: formData.get("bill_date"),
         total_amount: formData.get("total_amount"),
         received_amount: formData.get("received_amount"),
+        freight_charges: formData.get("freight_charges"),
+        loading_charges: formData.get("loading_charges"),
+        discount: formData.get("discount"),
+        prepared_by: formData.get("prepared_by"),
+        approved_by: formData.get("approved_by"),
         items,
     });
 }
@@ -77,18 +95,24 @@ export async function createBillAction(
 
     const { supabase, user } = await requireUser();
 
-    // Insert the bill shell first. bill_no is assigned by the DB trigger.
-    // total_amount starts at 0 and the bill_items trigger updates it once
-    // items are inserted.
     const { data: bill, error: billErr } = await supabase
         .from("bills")
         .insert({
             user_id: user.id,
             customer_name: parsed.data.customer_name,
             customer_phone: parsed.data.customer_phone ?? null,
+            address: parsed.data.address ?? null,
+            email: parsed.data.email ?? null,
+            ntn: parsed.data.ntn ?? null,
+            stn: parsed.data.stn ?? null,
             bill_date: parsed.data.bill_date,
             total_amount: parsed.data.total_amount,
             received_amount: parsed.data.received_amount,
+            freight_charges: parsed.data.freight_charges,
+            loading_charges: parsed.data.loading_charges,
+            discount: parsed.data.discount,
+            prepared_by: parsed.data.prepared_by ?? null,
+            approved_by: parsed.data.approved_by ?? null,
         })
         .select("id")
         .single();
@@ -104,7 +128,7 @@ export async function createBillAction(
             user_id: user.id,
             sr_no: i + 1,
             description: item.description,
-            quantity: item.quantity,
+            quantity: item.quantity ?? null,
             weight: item.weight ?? null,
             rate: item.rate,
         })),
@@ -112,7 +136,6 @@ export async function createBillAction(
 
     if (itemsErr) {
         console.error("[createBillAction] insert items failed:", itemsErr);
-        // Compensate — remove the bill so we don't leave an empty shell.
         await supabase.from("bills").delete().eq("id", bill.id);
         return { error: "Could not save the bill's items. Please try again." };
     }
@@ -143,9 +166,18 @@ export async function updateBillAction(
         .update({
             customer_name: parsed.data.customer_name,
             customer_phone: parsed.data.customer_phone ?? null,
+            address: parsed.data.address ?? null,
+            email: parsed.data.email ?? null,
+            ntn: parsed.data.ntn ?? null,
+            stn: parsed.data.stn ?? null,
             bill_date: parsed.data.bill_date,
             total_amount: parsed.data.total_amount,
             received_amount: parsed.data.received_amount,
+            freight_charges: parsed.data.freight_charges,
+            loading_charges: parsed.data.loading_charges,
+            discount: parsed.data.discount,
+            prepared_by: parsed.data.prepared_by ?? null,
+            approved_by: parsed.data.approved_by ?? null,
         })
         .eq("id", id);
 
@@ -154,7 +186,6 @@ export async function updateBillAction(
         return { error: "Could not update the bill. Please try again." };
     }
 
-    // Replace line items. Simpler than diffing — the table is small per bill.
     const { error: deleteErr } = await supabase
         .from("bill_items")
         .delete()
@@ -171,7 +202,7 @@ export async function updateBillAction(
             user_id: user.id,
             sr_no: i + 1,
             description: item.description,
-            quantity: item.quantity,
+            quantity: item.quantity ?? null,
             weight: item.weight ?? null,
             rate: item.rate,
         })),
@@ -195,7 +226,6 @@ export async function updateBillAction(
 export async function deleteBillAction(id: string) {
     const { supabase } = await requireUser();
 
-    // bill_items cascade via FK `on delete cascade`.
     const { error } = await supabase.from("bills").delete().eq("id", id);
     if (error) {
         console.error("[deleteBillAction] delete failed:", error);
@@ -211,7 +241,7 @@ export async function deleteBillAction(id: string) {
 export type BillItemRow = {
     sr_no: number;
     description: string;
-    quantity: string;
+    quantity: string | null;
     weight: string | null;
     rate: string;
     amount: string;

@@ -47,7 +47,7 @@ export default async function PendingsPage({
             <section className="space-y-6">
                 <header>
                     <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                        Pendings
+                        Receivables
                     </h1>
                     <p className="mt-2 text-base text-muted-foreground">
                         Outstanding balances by customer.
@@ -55,7 +55,7 @@ export default async function PendingsPage({
                 </header>
                 <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
                     <p className="text-sm font-medium text-destructive">
-                        Could not load pendings.
+                        Could not load receivables.
                     </p>
                     <p className="mt-1 text-xs text-destructive/80">{error.message}</p>
                 </div>
@@ -96,7 +96,7 @@ export default async function PendingsPage({
         <section className="space-y-8">
             <header>
                 <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    Pendings
+                    Receivables
                 </h1>
                 <p className="mt-2 text-base text-muted-foreground">
                     Outstanding balances grouped by customer.

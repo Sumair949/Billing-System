@@ -4,11 +4,21 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, isAdminEmail } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createUserSchema } from "@/lib/validation/admin";
+import { createUserSchema, updateShopInfoSchema } from "@/lib/validation/admin";
 
 export type CreateUserFormState = {
     error?: string;
-    fieldErrors?: Partial<Record<"email" | "password" | "shop_name", string>>;
+    fieldErrors?: Partial<
+        Record<
+            | "email"
+            | "password"
+            | "shop_name"
+            | "shop_address"
+            | "shop_phone"
+            | "shop_email",
+            string
+        >
+    >;
 };
 
 export async function createUserAction(
@@ -21,6 +31,9 @@ export async function createUserAction(
         email: formData.get("email"),
         password: formData.get("password"),
         shop_name: formData.get("shop_name"),
+        shop_address: formData.get("shop_address"),
+        shop_phone: formData.get("shop_phone"),
+        shop_email: formData.get("shop_email"),
     });
 
     if (!parsed.success) {
@@ -28,7 +41,7 @@ export async function createUserAction(
         for (const issue of parsed.error.issues) {
             const raw = issue.path[0];
             if (typeof raw !== "string") continue;
-            const key = raw as "email" | "password" | "shop_name";
+            const key = raw as keyof NonNullable<CreateUserFormState["fieldErrors"]>;
             if (!out[key]) out[key] = issue.message;
         }
         return { fieldErrors: out };
@@ -39,7 +52,12 @@ export async function createUserAction(
         email: parsed.data.email,
         password: parsed.data.password,
         email_confirm: true,
-        user_metadata: { shop_name: parsed.data.shop_name },
+        user_metadata: {
+            shop_name: parsed.data.shop_name,
+            shop_address: parsed.data.shop_address ?? null,
+            shop_phone: parsed.data.shop_phone ?? null,
+            shop_email: parsed.data.shop_email ?? null,
+        },
     });
 
     if (error) {
@@ -52,6 +70,71 @@ export async function createUserAction(
 
     revalidatePath("/admin");
     redirect("/admin?flash=user-created");
+}
+
+export type UpdateShopFormState = {
+    error?: string;
+    success?: boolean;
+    fieldErrors?: Partial<
+        Record<"shop_name" | "shop_address" | "shop_phone" | "shop_email", string>
+    >;
+};
+
+export async function updateShopInfoAction(
+    userId: string,
+    _prev: UpdateShopFormState,
+    formData: FormData,
+): Promise<UpdateShopFormState> {
+    await requireAdmin();
+
+    const parsed = updateShopInfoSchema.safeParse({
+        shop_name: formData.get("shop_name"),
+        shop_address: formData.get("shop_address"),
+        shop_phone: formData.get("shop_phone"),
+        shop_email: formData.get("shop_email"),
+    });
+
+    if (!parsed.success) {
+        const out: UpdateShopFormState["fieldErrors"] = {};
+        for (const issue of parsed.error.issues) {
+            const raw = issue.path[0];
+            if (typeof raw !== "string") continue;
+            const key = raw as keyof NonNullable<UpdateShopFormState["fieldErrors"]>;
+            if (!out[key]) out[key] = issue.message;
+        }
+        return { fieldErrors: out };
+    }
+
+    const adminClient = createSupabaseAdminClient();
+
+    // Merge into existing metadata so we don't wipe other fields.
+    const { data: target, error: fetchErr } =
+        await adminClient.auth.admin.getUserById(userId);
+    if (fetchErr || !target?.user) {
+        return { error: "Could not load this user." };
+    }
+
+    const existing = (target.user.user_metadata ?? {}) as Record<string, unknown>;
+    const { error: updErr } = await adminClient.auth.admin.updateUserById(userId, {
+        user_metadata: {
+            ...existing,
+            shop_name: parsed.data.shop_name,
+            shop_address: parsed.data.shop_address ?? null,
+            shop_phone: parsed.data.shop_phone ?? null,
+            shop_email: parsed.data.shop_email ?? null,
+        },
+    });
+
+    if (updErr) {
+        console.error("[updateShopInfoAction] updateUserById failed:", updErr);
+        return { error: "Could not update shop info. Please try again." };
+    }
+
+    revalidatePath("/admin");
+    revalidatePath(`/admin/users/${userId}`);
+    // Prints / app-shell of the affected user read this metadata; revalidate the layout.
+    revalidatePath("/", "layout");
+    return { success: true };
 }
 
 export async function setUserDisabledAction(userId: string, disable: boolean) {

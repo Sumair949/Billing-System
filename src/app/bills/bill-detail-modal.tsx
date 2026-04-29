@@ -110,7 +110,7 @@ export function BillDetailModal({
                                     <thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                                         <tr>
                                             <th className="px-4 py-3 text-left font-semibold">
-                                                Sr#
+                                                SR #
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold">
                                                 Description
@@ -119,7 +119,7 @@ export function BillDetailModal({
                                                 Qty
                                             </th>
                                             <th className="px-4 py-3 text-right font-semibold">
-                                                Weight
+                                                Wt.
                                             </th>
                                             <th className="px-4 py-3 text-right font-semibold">
                                                 Rate

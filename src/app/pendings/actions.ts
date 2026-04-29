@@ -11,7 +11,7 @@ export type CustomerBill = {
     items: {
         sr_no: number;
         description: string;
-        quantity: string;
+        quantity: string | null;
         weight: string | null;
         rate: string;
         amount: string;

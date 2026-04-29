@@ -1,4 +1,4 @@
-import { ChevronLeft, Mail, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Mail, Pencil, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin, isAdminEmail } from "@/lib/auth";
@@ -96,6 +96,15 @@ export default async function AdminUserDetailPage({
                             {user.email}
                         </p>
                     </div>
+                    {isAdmin ? null : (
+                        <Link
+                            href={`/admin/users/${user.id}/edit`}
+                            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                        >
+                            <Pencil className="h-4 w-4" aria-hidden />
+                            Edit shop info
+                        </Link>
+                    )}
                 </div>
             </div>
 

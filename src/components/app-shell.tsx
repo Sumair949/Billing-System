@@ -1,9 +1,11 @@
 import {
+    CreditCard,
     KeyRound,
     LayoutDashboard,
     LogOut,
     Receipt,
     ShieldCheck,
+    ShoppingCart,
     User as UserIcon,
     Wallet,
 } from "lucide-react";
@@ -111,8 +113,22 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                                 <li>
                                     <NavLink
                                         href="/pendings"
-                                        label="Pendings"
+                                        label="Receivables"
                                         icon={<Wallet className="h-5 w-5" />}
+                                    />
+                                </li>
+                                <li>
+                                    <NavLink
+                                        href="/purchases"
+                                        label="Purchases"
+                                        icon={<ShoppingCart className="h-5 w-5" />}
+                                    />
+                                </li>
+                                <li>
+                                    <NavLink
+                                        href="/payables"
+                                        label="Payables"
+                                        icon={<CreditCard className="h-5 w-5" />}
                                     />
                                 </li>
                                 {admin ? (

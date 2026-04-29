@@ -2,63 +2,63 @@ import { notFound } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import { readShopInfo } from "@/lib/shop";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { LedgerTable, type LedgerRow } from "./ledger-table";
+import { PayablesLedgerTable, type PayablesLedgerRow } from "./ledger-table";
 import { PrintActions } from "./print-actions";
 
-export default async function PrintLedgerPage({
+export default async function PrintPayablesLedgerPage({
     params,
 }: {
-    params: Promise<{ customerName: string }>;
+    params: Promise<{ supplierName: string }>;
 }) {
-    const { customerName: encodedName } = await params;
-    const customerName = decodeURIComponent(encodedName);
+    const { supplierName: encodedName } = await params;
+    const supplierName = decodeURIComponent(encodedName);
 
     const supabase = await createSupabaseServerClient();
 
-    const [billsRes, userRes] = await Promise.all([
+    const [purchasesRes, userRes] = await Promise.all([
         supabase
-            .from("bills")
-            .select("id, bill_no, bill_date, total_amount, received_amount")
-            .eq("customer_name", customerName)
+            .from("purchases")
+            .select("id, purchase_no, purchase_date, total_amount, paid_amount")
+            .eq("supplier_name", supplierName)
             .gt("total_amount", "0")
-            .order("bill_date", { ascending: true })
+            .order("purchase_date", { ascending: true })
             .order("created_at", { ascending: true }),
         supabase.auth.getUser(),
     ]);
 
-    if (billsRes.error || !billsRes.data || billsRes.data.length === 0) {
+    if (purchasesRes.error || !purchasesRes.data || purchasesRes.data.length === 0) {
         notFound();
     }
 
-    const bills = billsRes.data;
+    const purchases = purchasesRes.data;
     const shop = readShopInfo(userRes.data.user?.user_metadata);
 
-    const billIds = bills.map((b) => b.id);
+    const purchaseIds = purchases.map((p) => p.id);
     const { data: allItems } = await supabase
-        .from("bill_items")
-        .select("bill_id, description, sr_no")
-        .in("bill_id", billIds)
-        .order("bill_id")
+        .from("purchase_items")
+        .select("purchase_id, description, sr_no")
+        .in("purchase_id", purchaseIds)
+        .order("purchase_id")
         .order("sr_no");
 
-    const descsByBill = new Map<string, string[]>();
+    const descsByPurchase = new Map<string, string[]>();
     for (const item of allItems ?? []) {
-        const arr = descsByBill.get(item.bill_id) ?? [];
+        const arr = descsByPurchase.get(item.purchase_id) ?? [];
         arr.push(item.description);
-        descsByBill.set(item.bill_id, arr);
+        descsByPurchase.set(item.purchase_id, arr);
     }
 
-    const ledgerRows: LedgerRow[] = bills.map((bill) => ({
-        id: bill.id,
-        bill_no: bill.bill_no,
-        bill_date: bill.bill_date,
-        debit: Number(bill.total_amount),
-        credit: Number(bill.received_amount),
-        descriptions: (descsByBill.get(bill.id) ?? []).join(", "),
+    const ledgerRows: PayablesLedgerRow[] = purchases.map((p) => ({
+        id: p.id,
+        invoice_no: p.purchase_no,
+        purchase_date: p.purchase_date,
+        debit: Number(p.total_amount),
+        credit: Number(p.paid_amount),
+        descriptions: (descsByPurchase.get(p.id) ?? []).join(", "),
     }));
 
-    const fromDate = bills[0].bill_date;
-    const toDate = bills[bills.length - 1].bill_date;
+    const fromDate = purchases[0].purchase_date;
+    const toDate = purchases[purchases.length - 1].purchase_date;
 
     return (
         <div className="min-h-screen bg-gray-100 py-8 print:bg-white print:py-0">
@@ -91,7 +91,7 @@ export default async function PrintLedgerPage({
                                     {shop.email}
                                 </p>
                             ) : null}
-                            <p className="mt-0.5 text-xs text-gray-500">Account Statement</p>
+                            <p className="mt-0.5 text-xs text-gray-500">Supplier Account Statement</p>
                         </div>
                         <div className="text-right">
                             <p className="text-base font-bold uppercase tracking-widest text-gray-700">
@@ -99,23 +99,19 @@ export default async function PrintLedgerPage({
                             </p>
                             <p className="mt-0.5 text-xs text-gray-500">
                                 {formatDate(fromDate)}
-                                {fromDate !== toDate
-                                    ? ` — ${formatDate(toDate)}`
-                                    : ""}
+                                {fromDate !== toDate ? ` — ${formatDate(toDate)}` : ""}
                             </p>
                         </div>
                     </header>
 
                     <section className="border-b border-gray-200 py-3">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                            Account
+                            Supplier
                         </p>
-                        <p className="mt-1 text-sm font-semibold">
-                            {customerName}
-                        </p>
+                        <p className="mt-1 text-sm font-semibold">{supplierName}</p>
                     </section>
 
-                    <LedgerTable rows={ledgerRows} />
+                    <PayablesLedgerTable rows={ledgerRows} />
 
                     {/* Spacer pushes signatures + footer to the bottom of the page */}
                     <div className="flex-1" />
@@ -130,16 +126,13 @@ export default async function PrintLedgerPage({
                         <div>
                             <div className="mb-1 border-b border-gray-400" />
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Customer signature
+                                Supplier signature
                             </p>
                         </div>
                     </section>
 
                     <footer className="mt-6 border-t border-gray-200 pt-4 text-center text-[10px] text-gray-500">
-                        <p>
-                            This is a system-generated statement. Thank you for
-                            your business.
-                        </p>
+                        <p>This is a system-generated statement. Thank you for your business.</p>
                     </footer>
                 </div>
             </div>

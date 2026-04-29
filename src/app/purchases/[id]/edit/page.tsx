@@ -2,10 +2,10 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { updateBillAction, type BillFormState } from "../../actions";
-import { BillForm } from "../../bill-form";
+import { updatePurchaseAction, type PurchaseFormState } from "../../actions";
+import { PurchaseForm } from "../../purchase-form";
 
-export default async function EditBillPage({
+export default async function EditPurchasePage({
     params,
 }: {
     params: Promise<{ id: string }>;
@@ -14,26 +14,26 @@ export default async function EditBillPage({
 
     const supabase = await createSupabaseServerClient();
 
-    const [billRes, itemsRes] = await Promise.all([
+    const [purchaseRes, itemsRes] = await Promise.all([
         supabase
-            .from("bills")
+            .from("purchases")
             .select(
-                "id, bill_no, customer_name, customer_phone, address, email, ntn, stn, bill_date, total_amount, received_amount, freight_charges, loading_charges, discount, prepared_by, approved_by",
+                "id, purchase_no, supplier_name, purchase_date, total_amount, paid_amount, freight_charges, loading_charges, discount, prepared_by, approved_by",
             )
             .eq("id", id)
             .maybeSingle(),
         supabase
-            .from("bill_items")
+            .from("purchase_items")
             .select("sr_no, description, quantity, weight, rate")
-            .eq("bill_id", id)
+            .eq("purchase_id", id)
             .order("sr_no", { ascending: true }),
     ]);
 
-    if (billRes.error || !billRes.data) {
+    if (purchaseRes.error || !purchaseRes.data) {
         notFound();
     }
 
-    const bill = billRes.data;
+    const purchase = purchaseRes.data;
     const items = (itemsRes.data ?? []).map((it) => ({
         description: it.description,
         quantity: it.quantity != null ? String(it.quantity) : "",
@@ -41,50 +41,45 @@ export default async function EditBillPage({
         rate: String(it.rate),
     }));
 
-    async function action(state: BillFormState, formData: FormData) {
+    async function action(state: PurchaseFormState, formData: FormData) {
         "use server";
-        return updateBillAction(id, state, formData);
+        return updatePurchaseAction(id, state, formData);
     }
 
     return (
         <section className="mx-auto w-full max-w-5xl space-y-8">
             <div>
                 <Link
-                    href="/"
+                    href="/purchases"
                     className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
                 >
                     <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                    Back to dashboard
+                    Back to purchases
                 </Link>
                 <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-                    Edit bill
+                    Edit purchase
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                    Bill no.{" "}
+                    Purchase no.{" "}
                     <span className="font-mono font-semibold text-foreground">
-                        {bill.bill_no}
+                        {purchase.purchase_no}
                     </span>
                 </p>
             </div>
 
-            <BillForm
+            <PurchaseForm
                 action={action}
                 submitLabel="Save changes"
                 defaultValues={{
-                    customer_name: bill.customer_name,
-                    customer_phone: bill.customer_phone ?? "",
-                    address: bill.address ?? "",
-                    email: bill.email ?? "",
-                    ntn: bill.ntn ?? "",
-                    stn: bill.stn ?? "",
-                    bill_date: bill.bill_date,
-                    total_amount: String(bill.total_amount),
-                    received_amount: String(bill.received_amount),
-                    freight_charges: String(bill.freight_charges ?? "0"),
-                    loading_charges: String(bill.loading_charges ?? "0"),
-                    discount: String(bill.discount ?? "0"),
-                    prepared_by: bill.prepared_by ?? "",
-                    approved_by: bill.approved_by ?? "",
+                    supplier_name: purchase.supplier_name,
+                    purchase_date: purchase.purchase_date,
+                    total_amount: String(purchase.total_amount),
+                    paid_amount: String(purchase.paid_amount),
+                    freight_charges: String(purchase.freight_charges ?? "0"),
+                    loading_charges: String(purchase.loading_charges ?? "0"),
+                    discount: String(purchase.discount ?? "0"),
+                    prepared_by: purchase.prepared_by ?? "",
+                    approved_by: purchase.approved_by ?? "",
                     items,
                 }}
             />
