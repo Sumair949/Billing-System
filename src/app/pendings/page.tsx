@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatAmount } from "@/lib/format";
 import { CustomerBillsModal } from "./customer-bills-modal";
+import { RecordCashModal } from "./record-cash-modal";
 import { PendingsFilters } from "./filters";
 
 type RpcRow = {
@@ -210,6 +211,10 @@ export default async function PendingsPage({
                                                 <CustomerBillsModal
                                                     customerName={r.customer_name}
                                                     pendingAmount={formatAmount(r.pending_amount)}
+                                                />
+                                                <RecordCashModal
+                                                    customerName={r.customer_name}
+                                                    pendingAmount={r.pending_amount}
                                                 />
                                                 <Link
                                                     href={`/print/ledger/${encodeURIComponent(r.customer_name)}`}

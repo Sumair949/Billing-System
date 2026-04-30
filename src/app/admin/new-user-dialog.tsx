@@ -118,6 +118,37 @@ export function NewUserDialog() {
                             <FieldError message={state.fieldErrors?.shop_email} />
                         </div>
 
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="new-user-ntn">NTN</Label>
+                                <Input
+                                    id="new-user-ntn"
+                                    name="shop_ntn"
+                                    type="text"
+                                    maxLength={50}
+                                    placeholder="1234567-8"
+                                    aria-invalid={
+                                        state.fieldErrors?.shop_ntn ? true : undefined
+                                    }
+                                />
+                                <FieldError message={state.fieldErrors?.shop_ntn} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="new-user-stn">STN</Label>
+                                <Input
+                                    id="new-user-stn"
+                                    name="shop_stn"
+                                    type="text"
+                                    maxLength={50}
+                                    placeholder="12-34-5678-001-56"
+                                    aria-invalid={
+                                        state.fieldErrors?.shop_stn ? true : undefined
+                                    }
+                                />
+                                <FieldError message={state.fieldErrors?.shop_stn} />
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="new-user-email">Email</Label>
                             <Input

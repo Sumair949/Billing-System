@@ -35,6 +35,8 @@ const shopFields = {
     shop_address: optionalText(500),
     shop_phone: optionalText(50),
     shop_email: optionalEmail,
+    shop_ntn: optionalText(50),
+    shop_stn: optionalText(50),
 };
 
 export const createUserSchema = z.object({

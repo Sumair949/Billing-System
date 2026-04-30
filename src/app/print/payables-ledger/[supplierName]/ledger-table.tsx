@@ -10,6 +10,7 @@ export type PayablesLedgerRow = {
     debit: number;
     credit: number;
     descriptions: string;
+    type: "purchase" | "cash";
 };
 
 export function PayablesLedgerTable({ rows }: { rows: PayablesLedgerRow[] }) {
@@ -23,6 +24,12 @@ export function PayablesLedgerTable({ rows }: { rows: PayablesLedgerRow[] }) {
         let totalDebit = 0;
         let totalCredit = 0;
         const out = rows.map((row, i) => {
+            // Cash rows are reference markers. The payment has already been applied
+            // to purchases (paid_amount updated), so counting it again here would
+            // double up the totals.
+            if (row.type === "cash") {
+                return { ...row, balance: runningBalance };
+            }
             const credit = Number(credits[i]) || 0;
             const debit = row.debit;
             totalDebit += debit;
@@ -37,89 +44,116 @@ export function PayablesLedgerTable({ rows }: { rows: PayablesLedgerRow[] }) {
         <>
             <table className="mt-4 w-full border-collapse text-xs">
                 <thead>
-                    <tr className="border-b-2 border-gray-900 text-left text-[10px] uppercase tracking-wider text-gray-600 [&_th]:pr-3">
-                        <th className="w-6 py-2 font-semibold">#</th>
-                        <th className="w-20 py-2 font-semibold">Date</th>
-                        <th className="w-20 py-2 font-semibold">INV NO.</th>
-                        <th className="w-20 py-2 font-semibold">PO No.</th>
-                        <th className="py-2 font-semibold">Description</th>
-                        <th className="w-20 py-2 text-right font-semibold">Total</th>
-                        <th className="w-24 py-2 text-right font-semibold">Credit</th>
-                        <th className="w-20 py-2 pr-0 text-right font-semibold">Balance</th>
+                    <tr className="bg-gray-900 text-left text-[9px] uppercase tracking-wider text-gray-200 print:bg-transparent print:border-b-2 print:border-black print:text-black [&_th]:pr-3">
+                        <th className="w-6 py-1.5 pl-2 font-semibold">#</th>
+                        <th className="w-20 py-1.5 font-semibold">Date</th>
+                        <th className="w-20 py-1.5 font-semibold">INV NO.</th>
+                        <th className="w-20 py-1.5 font-semibold">PO No.</th>
+                        <th className="py-1.5 font-semibold">Description</th>
+                        <th className="w-20 py-1.5 text-right font-semibold">Total</th>
+                        <th className="w-24 py-1.5 text-right font-semibold">Credit</th>
+                        <th className="w-20 py-1.5 pr-0 text-right font-semibold">Balance</th>
                     </tr>
                 </thead>
                 <tbody>
                     {computed.rows.map((row, idx) => (
-                        <tr key={row.id} className="border-b border-gray-100 align-top [&_td]:pr-3">
-                            <td className="py-2 font-mono text-[10px] text-gray-400">
+                        <tr
+                            key={row.id}
+                            className="border-b border-gray-100 align-top print:border-gray-300 [&_td]:pr-3"
+                        >
+                            <td className="py-1.5 pl-2 font-mono text-[10px] text-gray-400 print:text-gray-700">
                                 {idx + 1}
                             </td>
-                            <td className="py-2 text-gray-700">
+                            <td className="py-1.5 text-gray-700 print:text-black">
                                 {formatDate(row.purchase_date)}
                             </td>
-                            <td className="py-2 font-mono font-semibold text-gray-900">
-                                {row.invoice_no}
+                            <td className="py-1.5 font-mono font-semibold text-gray-900 print:text-black">
+                                {row.type === "cash" ? (
+                                    <span className="text-gray-400 print:text-gray-600">—</span>
+                                ) : (
+                                    row.invoice_no
+                                )}
                             </td>
-                            <td className="py-2">
-                                <input
-                                    type="text"
-                                    value={poNums[idx]}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setPoNums((prev) =>
-                                            prev.map((p, i) => (i === idx ? val : p)),
-                                        );
-                                    }}
-                                    onFocus={(e) => e.target.select()}
-                                    placeholder="—"
-                                    className="w-full bg-transparent font-mono text-[10px] text-gray-500 outline-none focus:text-gray-900 print:text-gray-500"
-                                />
+                            <td className="py-1.5">
+                                {row.type === "cash" ? (
+                                    <span className="text-gray-400 print:text-gray-600">—</span>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={poNums[idx]}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setPoNums((prev) =>
+                                                prev.map((p, i) => (i === idx ? val : p)),
+                                            );
+                                        }}
+                                        onFocus={(e) => e.target.select()}
+                                        placeholder="—"
+                                        className="w-full bg-transparent font-mono text-[10px] text-gray-500 outline-none focus:text-gray-900 print:text-gray-800"
+                                    />
+                                )}
                             </td>
-                            <td className="py-2 text-[10px] text-gray-600">
+                            <td className="py-1.5 text-[10px] text-gray-600 print:text-gray-900">
                                 {row.descriptions || "—"}
                             </td>
-                            <td className="py-2 text-right font-mono">
-                                {formatAmountPlain(row.debit)}
+                            <td className="py-1.5 text-right font-mono print:text-black">
+                                {row.type === "cash" ? (
+                                    <span className="text-gray-400 print:text-gray-600">—</span>
+                                ) : (
+                                    formatAmountPlain(row.debit)
+                                )}
                             </td>
-                            <td className="py-2 text-right">
-                                <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={credits[idx]}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setCredits((prev) =>
-                                            prev.map((c, i) => (i === idx ? val : c)),
-                                        );
-                                    }}
-                                    onFocus={(e) => e.target.select()}
-                                    placeholder="—"
-                                    className="w-full bg-transparent text-right font-mono text-xs text-gray-500 outline-none focus:text-gray-900 print:text-gray-500"
-                                />
+                            <td className="py-1.5 text-right">
+                                {row.type === "cash" ? (
+                                    <span className="font-mono text-[10px] text-emerald-700 print:font-bold print:text-black">
+                                        {formatAmountPlain(row.credit)}
+                                    </span>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={credits[idx]}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setCredits((prev) =>
+                                                prev.map((c, i) => (i === idx ? val : c)),
+                                            );
+                                        }}
+                                        onFocus={(e) => e.target.select()}
+                                        placeholder="—"
+                                        className="w-full bg-transparent text-right font-mono text-xs text-gray-500 outline-none focus:text-gray-900 print:text-gray-800"
+                                    />
+                                )}
                             </td>
-                            <td className="py-2 pr-0 text-right font-mono font-semibold">
-                                {formatAmountPlain(row.balance)}
+                            <td className="py-1.5 pr-0 text-right font-mono font-semibold print:text-black">
+                                {row.type === "cash" ? (
+                                    <span className="text-[10px] font-normal text-gray-400 print:text-gray-600">
+                                        applied
+                                    </span>
+                                ) : (
+                                    formatAmountPlain(row.balance)
+                                )}
                             </td>
                         </tr>
                     ))}
                 </tbody>
                 <tfoot>
-                    <tr className="border-t-2 border-gray-900 [&_td]:pr-3">
+                    <tr className="border-t-2 border-gray-900 print:border-black [&_td]:pr-3">
                         <td
                             colSpan={5}
-                            className="py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-600"
+                            className="py-2 pl-2 text-[10px] font-semibold uppercase tracking-wide text-gray-600 print:text-black"
                         >
                             Net Movement
                         </td>
-                        <td className="py-2 text-right font-mono font-semibold">
+                        <td className="py-2 text-right font-mono font-semibold print:text-black">
                             {formatAmountPlain(computed.totalDebit)}
                         </td>
-                        <td className="py-2 text-right font-mono font-semibold text-gray-500">
+                        <td className="py-2 text-right font-mono font-semibold text-gray-500 print:text-black">
                             {computed.totalCredit > 0
                                 ? formatAmountPlain(computed.totalCredit)
                                 : "—"}
                         </td>
-                        <td className="py-2 pr-0 text-right font-mono font-bold">
+                        <td className="py-2 pr-0 text-right font-mono font-bold print:text-black">
                             {formatAmountPlain(computed.netBalance)}
                         </td>
                     </tr>
@@ -128,19 +162,19 @@ export function PayablesLedgerTable({ rows }: { rows: PayablesLedgerRow[] }) {
 
             <section className="mt-3 flex justify-end">
                 <dl className="w-full max-w-xs space-y-0.5 text-xs">
-                    <div className="flex justify-between border-b border-gray-200 py-1.5">
-                        <dt className="text-gray-600">Total purchased</dt>
-                        <dd className="font-mono font-semibold">
+                    <div className="flex justify-between border-b border-gray-200 py-1.5 print:border-gray-400">
+                        <dt className="text-gray-600 print:text-gray-900">Total purchased</dt>
+                        <dd className="font-mono font-semibold print:text-black">
                             {CURRENCY_SYMBOL} {formatAmountPlain(computed.totalDebit)}
                         </dd>
                     </div>
                     <div className="flex justify-between py-1.5">
-                        <dt className="text-gray-600">Total paid</dt>
-                        <dd className="font-mono">
+                        <dt className="text-gray-600 print:text-gray-900">Total paid</dt>
+                        <dd className="font-mono print:text-black">
                             {CURRENCY_SYMBOL} {formatAmountPlain(computed.totalCredit)}
                         </dd>
                     </div>
-                    <div className="flex justify-between border-t-2 border-gray-900 py-2 text-sm font-bold">
+                    <div className="flex justify-between border-t-2 border-gray-900 py-2 text-sm font-bold print:border-black print:text-black">
                         <dt>Balance due</dt>
                         <dd className="font-mono">
                             {CURRENCY_SYMBOL} {formatAmountPlain(computed.netBalance)}

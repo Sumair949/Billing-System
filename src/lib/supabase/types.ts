@@ -95,6 +95,42 @@ export type PurchaseUpdate = Partial<
 
 export type PurchaseItemInsert = Omit<PurchaseItem, "id" | "amount" | "created_at">;
 
+export type CashReceipt = {
+    id: string;
+    user_id: string;
+    customer_name: string;
+    amount: string;
+    receipt_date: string;
+    notes: string | null;
+    created_at: string;
+};
+
+export type CashReceiptInsert = {
+    user_id: string;
+    customer_name: string;
+    amount: number;
+    receipt_date: string;
+    notes?: string | null;
+};
+
+export type CashPayment = {
+    id: string;
+    user_id: string;
+    supplier_name: string;
+    amount: string;
+    payment_date: string;
+    notes: string | null;
+    created_at: string;
+};
+
+export type CashPaymentInsert = {
+    user_id: string;
+    supplier_name: string;
+    amount: number;
+    payment_date: string;
+    notes?: string | null;
+};
+
 type EmptyRecord = Record<string, never>;
 
 export type Database = {
@@ -122,6 +158,18 @@ export type Database = {
                 Row: PurchaseItem;
                 Insert: PurchaseItemInsert;
                 Update: Partial<PurchaseItemInsert>;
+                Relationships: [];
+            };
+            cash_receipts: {
+                Row: CashReceipt;
+                Insert: CashReceiptInsert;
+                Update: Partial<CashReceiptInsert>;
+                Relationships: [];
+            };
+            cash_payments: {
+                Row: CashPayment;
+                Insert: CashPaymentInsert;
+                Update: Partial<CashPaymentInsert>;
                 Relationships: [];
             };
         };

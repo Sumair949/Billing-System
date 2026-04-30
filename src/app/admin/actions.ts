@@ -15,7 +15,9 @@ export type CreateUserFormState = {
             | "shop_name"
             | "shop_address"
             | "shop_phone"
-            | "shop_email",
+            | "shop_email"
+            | "shop_ntn"
+            | "shop_stn",
             string
         >
     >;
@@ -34,6 +36,8 @@ export async function createUserAction(
         shop_address: formData.get("shop_address"),
         shop_phone: formData.get("shop_phone"),
         shop_email: formData.get("shop_email"),
+        shop_ntn: formData.get("shop_ntn"),
+        shop_stn: formData.get("shop_stn"),
     });
 
     if (!parsed.success) {
@@ -57,6 +61,8 @@ export async function createUserAction(
             shop_address: parsed.data.shop_address ?? null,
             shop_phone: parsed.data.shop_phone ?? null,
             shop_email: parsed.data.shop_email ?? null,
+            shop_ntn: parsed.data.shop_ntn ?? null,
+            shop_stn: parsed.data.shop_stn ?? null,
         },
     });
 
@@ -76,7 +82,7 @@ export type UpdateShopFormState = {
     error?: string;
     success?: boolean;
     fieldErrors?: Partial<
-        Record<"shop_name" | "shop_address" | "shop_phone" | "shop_email", string>
+        Record<"shop_name" | "shop_address" | "shop_phone" | "shop_email" | "shop_ntn" | "shop_stn", string>
     >;
 };
 
@@ -92,6 +98,8 @@ export async function updateShopInfoAction(
         shop_address: formData.get("shop_address"),
         shop_phone: formData.get("shop_phone"),
         shop_email: formData.get("shop_email"),
+        shop_ntn: formData.get("shop_ntn"),
+        shop_stn: formData.get("shop_stn"),
     });
 
     if (!parsed.success) {
@@ -122,6 +130,8 @@ export async function updateShopInfoAction(
             shop_address: parsed.data.shop_address ?? null,
             shop_phone: parsed.data.shop_phone ?? null,
             shop_email: parsed.data.shop_email ?? null,
+            shop_ntn: parsed.data.shop_ntn ?? null,
+            shop_stn: parsed.data.shop_stn ?? null,
         },
     });
 

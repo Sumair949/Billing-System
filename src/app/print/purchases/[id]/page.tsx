@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { CURRENCY_SYMBOL, formatAmountPlain, formatDate } from "@/lib/format";
 import { readShopInfo } from "@/lib/shop";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PrintBranding } from "@/components/print-branding";
 import { PrintActions } from "./print-actions";
 
 type ItemRow = {
@@ -63,179 +64,162 @@ export default async function PrintPurchasePage({
             `}</style>
 
             <div className="mx-auto max-w-2xl px-4 print:max-w-none print:px-0">
-                <PrintActions />
+                <PrintActions filename={`Purchase-${purchase.purchase_no}`} />
 
-                <div className="flex flex-col rounded-lg bg-white p-8 text-gray-900 shadow-sm ring-1 ring-gray-200 print:min-h-[20.5cm] print:rounded-none print:p-3 print:shadow-none print:ring-0">
-                    {/* Header */}
-                    <header className="flex items-start justify-between border-b-2 border-gray-900 pb-4">
-                        <div>
-                            <h1 className="text-xl font-bold uppercase tracking-tight sm:text-2xl">
-                                {shop.name}
-                            </h1>
-                            {shop.address ? (
-                                <p className="mt-0.5 text-xs text-gray-600">{shop.address}</p>
-                            ) : null}
-                            {shop.phone ? (
-                                <p className="mt-0.5 font-mono text-xs text-gray-600">
-                                    {shop.phone}
+                <div className="relative flex flex-col rounded-lg bg-white text-gray-900 shadow-md ring-1 ring-gray-200 print:min-h-[20.5cm] print:rounded-none print:shadow-none print:ring-0">
+                    {shop.watermark_url ? (
+                        <div
+                            className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg print:rounded-none"
+                            aria-hidden
+                        >
+                            <img
+                                src={shop.watermark_url}
+                                alt=""
+                                className="h-3/4 w-3/4 select-none object-contain opacity-[0.07]"
+                            />
+                        </div>
+                    ) : null}
+
+                    <div className="h-1.5 shrink-0 rounded-t-lg bg-gray-800 print:hidden" />
+
+                    <div className="flex flex-1 flex-col px-7 pb-5 pt-5 print:px-4 print:pb-3 print:pt-3">
+
+                        <header className="relative border-b-2 border-gray-200 pb-3 print:border-gray-900">
+                            <div className="text-center">
+                                <h1 className="text-xl font-extrabold uppercase tracking-tight text-gray-900 sm:text-2xl">
+                                    {shop.name}
+                                </h1>
+                                {[shop.address, shop.phone, shop.email].some(Boolean) ? (
+                                    <p className="mt-1 text-[11px] text-gray-500 print:text-gray-800">
+                                        {[shop.address, shop.phone, shop.email].filter(Boolean).join(" · ")}
+                                    </p>
+                                ) : null}
+                                <p className="mt-0.5 text-[11px] text-gray-500 print:text-gray-800">
+                                    NTN: {shop.ntn ?? "—"} &nbsp;·&nbsp; STN: {shop.stn ?? "—"}
                                 </p>
-                            ) : null}
-                            {shop.email ? (
-                                <p className="mt-0.5 text-xs text-gray-600">
-                                    {shop.email}
-                                </p>
-                            ) : null}
-                            <p className="mt-0.5 text-xs text-gray-500">Purchase Record</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-base font-bold uppercase tracking-widest text-gray-700">
-                                Purchase
-                            </p>
-                            <p className="mt-0.5 font-mono text-sm font-semibold">
-                                {purchase.purchase_no}
-                            </p>
-                        </div>
-                    </header>
+                            </div>
+                            <div className="absolute right-0 top-0 text-right">
+                                <div className="inline-block rounded bg-gray-900 px-3 py-1.5 print:bg-transparent print:border-2 print:border-black">
+                                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-300 print:text-black">Purchase</p>
+                                    <p className="mt-0.5 font-mono text-sm font-bold text-white print:text-black">{purchase.purchase_no}</p>
+                                </div>
+                                <p className="mt-1.5 text-[11px] text-gray-500 print:text-gray-800">{formatDate(purchase.purchase_date)}</p>
+                            </div>
+                        </header>
 
-                    {/* Supplier + Date */}
-                    <section className="grid grid-cols-2 gap-6 border-b border-gray-200 py-4">
-                        <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Supplier
-                            </p>
-                            <p className="mt-1 text-sm font-semibold">
-                                {purchase.supplier_name}
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Purchase date
-                            </p>
-                            <p className="mt-1 text-sm font-semibold">
-                                {formatDate(purchase.purchase_date)}
-                            </p>
-                        </div>
-                    </section>
+                        <section className="py-3">
+                            <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Supplier</p>
+                            <p className="text-sm font-bold text-gray-900">{purchase.supplier_name}</p>
+                        </section>
 
-                    {/* Items table */}
-                    <table className="mt-4 w-full border-collapse text-xs">
-                        <thead>
-                            <tr className="border-b-2 border-gray-900 text-left text-[10px] uppercase tracking-wider text-gray-600">
-                                <th className="w-12 py-2 font-semibold">Sr#</th>
-                                <th className="py-2 font-semibold">Description</th>
-                                <th className="w-14 py-2 text-right font-semibold">Qty</th>
-                                <th className="w-14 py-2 text-right font-semibold">Wt.</th>
-                                <th className="w-20 py-2 text-right font-semibold">Rate</th>
-                                <th className="w-22 py-2 text-right font-semibold">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {items.map((item) => (
-                                <tr
-                                    key={item.sr_no}
-                                    className="border-b border-gray-200 align-top"
-                                >
-                                    <td className="py-2 font-mono text-gray-500">
-                                        {String(item.sr_no).padStart(2, "0")}
-                                    </td>
-                                    <td className="py-2 pr-2">{item.description}</td>
-                                    <td className="py-2 text-right font-mono">
-                                        {item.quantity ?? "—"}
-                                    </td>
-                                    <td className="py-2 text-right font-mono text-gray-600">
-                                        {item.weight ?? "—"}
-                                    </td>
-                                    <td className="py-2 text-right font-mono">
-                                        {formatAmountPlain(item.rate)}
-                                    </td>
-                                    <td className="py-2 text-right font-mono font-semibold">
-                                        {formatAmountPlain(item.amount)}
-                                    </td>
+                        <div className="border-t border-gray-200 print:border-gray-500" />
+
+                        <table className="mt-3 w-full border-collapse text-xs">
+                            <thead>
+                                <tr className="bg-gray-900 text-left text-[9px] uppercase tracking-wider text-gray-200 print:bg-transparent print:border-b-2 print:border-black print:text-black">
+                                    <th className="w-10 py-1.5 pl-2 font-semibold">Sr#</th>
+                                    <th className="py-1.5 pl-2 font-semibold">Description</th>
+                                    <th className="w-14 py-1.5 text-right font-semibold">Qty</th>
+                                    <th className="w-14 py-1.5 text-right font-semibold">Wt.</th>
+                                    <th className="w-20 py-1.5 text-right font-semibold">Rate</th>
+                                    <th className="w-22 py-1.5 pl-4 pr-2 text-right font-semibold">Amount</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {items.map((item, i) => (
+                                    <tr
+                                        key={item.sr_no}
+                                        className={`border-b border-gray-100 align-top print:border-gray-300 ${i % 2 === 1 ? "bg-gray-50/60 print:bg-white" : ""}`}
+                                    >
+                                        <td className="py-1.5 pl-2 font-mono text-gray-400 print:text-gray-700">
+                                            {String(item.sr_no).padStart(2, "0")}
+                                        </td>
+                                        <td className="py-1.5 pl-2 pr-2 font-medium print:text-black">{item.description}</td>
+                                        <td className="py-1.5 text-right font-mono text-gray-600 print:text-black">{item.quantity ?? "—"}</td>
+                                        <td className="py-1.5 text-right font-mono text-gray-600 print:text-black">{item.weight ?? "—"}</td>
+                                        <td className="py-1.5 text-right font-mono print:text-black">{formatAmountPlain(item.rate)}</td>
+                                        <td className="py-1.5 pl-4 pr-2 text-right font-mono font-semibold print:text-black">{formatAmountPlain(item.amount)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
 
-                    {/* Summary */}
-                    <section className="mt-3 flex justify-end">
-                        <dl className="w-full max-w-xs space-y-0.5 text-xs">
-                            {(freightLoadingCharges > 0 || discountAmt > 0) ? (
-                                <div className="flex justify-between border-b border-gray-200 py-1.5">
-                                    <dt className="text-gray-600">Subtotal</dt>
-                                    <dd className="font-mono">{CURRENCY_SYMBOL} {formatAmountPlain(subtotal)}</dd>
+                        <section className="mt-3 flex justify-end">
+                            <div className="w-full max-w-xs rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs print:border-gray-400 print:bg-white">
+                                {(freightLoadingCharges > 0 || discountAmt > 0) ? (
+                                    <div className="flex justify-between border-b border-gray-200 pb-2 mb-2 print:border-gray-400">
+                                        <span className="text-gray-500 print:text-gray-800">Subtotal</span>
+                                        <span className="font-mono print:text-black">{CURRENCY_SYMBOL} {formatAmountPlain(subtotal)}</span>
+                                    </div>
+                                ) : null}
+                                {freightLoadingCharges > 0 ? (
+                                    <div className="flex justify-between py-0.5">
+                                        <span className="text-gray-500 print:text-gray-800">Freight &amp; Loading</span>
+                                        <span className="font-mono print:text-black">{CURRENCY_SYMBOL} {formatAmountPlain(freightLoadingCharges)}</span>
+                                    </div>
+                                ) : null}
+                                {discountAmt > 0 ? (
+                                    <div className="flex justify-between py-0.5 text-green-700 print:text-black">
+                                        <span>Discount</span>
+                                        <span className="font-mono">− {CURRENCY_SYMBOL} {formatAmountPlain(discountAmt)}</span>
+                                    </div>
+                                ) : null}
+                                <div className="mt-2 flex justify-between border-t border-gray-300 pt-2 print:border-gray-600">
+                                    <span className="font-semibold text-gray-700 print:text-black">Total</span>
+                                    <span className="font-mono font-semibold print:text-black">
+                                        {CURRENCY_SYMBOL} {formatAmountPlain(purchase.total_amount)}
+                                    </span>
                                 </div>
-                            ) : null}
-                            {freightLoadingCharges > 0 ? (
-                                <div className="flex justify-between py-1">
-                                    <dt className="text-gray-600">Freight &amp; Loading charges</dt>
-                                    <dd className="font-mono">{CURRENCY_SYMBOL} {formatAmountPlain(freightLoadingCharges)}</dd>
+                                <div className="mt-1 flex justify-between py-0.5">
+                                    <span className="text-gray-500 print:text-gray-800">Paid</span>
+                                    <span className="font-mono text-gray-600 print:text-black">
+                                        {CURRENCY_SYMBOL} {formatAmountPlain(purchase.paid_amount)}
+                                    </span>
                                 </div>
-                            ) : null}
-                            {discountAmt > 0 ? (
-                                <div className="flex justify-between py-1 text-green-700">
-                                    <dt>Discount</dt>
-                                    <dd className="font-mono">− {CURRENCY_SYMBOL} {formatAmountPlain(discountAmt)}</dd>
+                                <div
+                                    className={`mt-2 flex justify-between rounded px-2 py-2 text-sm font-bold print:rounded-none ${
+                                        payable > 0
+                                            ? "bg-gray-900 text-white print:bg-transparent print:text-black print:border-t-2 print:border-black"
+                                            : "bg-green-50 text-green-700 print:bg-transparent print:text-black print:border-t print:border-gray-600"
+                                    }`}
+                                >
+                                    <span>{payable > 0 ? "Balance Due" : "Fully Paid"}</span>
+                                    <span className="font-mono">{CURRENCY_SYMBOL} {formatAmountPlain(payable)}</span>
                                 </div>
-                            ) : null}
-                            <div className="flex justify-between border-b border-gray-200 py-1.5">
-                                <dt className="font-semibold">Total</dt>
-                                <dd className="font-mono font-semibold">
-                                    {CURRENCY_SYMBOL} {formatAmountPlain(purchase.total_amount)}
-                                </dd>
                             </div>
-                            <div className="flex justify-between py-1.5">
-                                <dt className="text-gray-600">Paid</dt>
-                                <dd className="font-mono">
-                                    {CURRENCY_SYMBOL} {formatAmountPlain(purchase.paid_amount)}
-                                </dd>
-                            </div>
-                            <div
-                                className={`flex justify-between py-2 ${
-                                    payable > 0
-                                        ? "border-t-2 border-gray-900 text-sm font-bold"
-                                        : "border-t border-gray-200"
-                                }`}
-                            >
-                                <dt>{payable > 0 ? "Balance due" : "Paid"}</dt>
-                                <dd className="font-mono">
-                                    {CURRENCY_SYMBOL} {formatAmountPlain(payable)}
-                                </dd>
-                            </div>
-                        </dl>
-                    </section>
+                        </section>
 
-                    {/* Spacer pushes signatures + footer to the bottom of the page */}
-                    <div className="flex-1" />
+                        <div className="flex-1 py-4" />
 
-                    {/* Signatures */}
-                    <section className="mt-8 grid grid-cols-2 gap-8 pt-6">
-                        <div>
-                            <div className="mb-1 border-b border-gray-400" />
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Prepared by
-                            </p>
-                            {purchase.prepared_by ? (
-                                <p className="mt-0.5 text-xs font-medium text-gray-700">
-                                    {purchase.prepared_by}
+                        <section className="grid grid-cols-2 gap-8">
+                            <div>
+                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Prepared by</p>
+                                {purchase.prepared_by ? (
+                                    <p className="mt-0.5 text-[11px] font-medium text-gray-700 print:text-black">{purchase.prepared_by}</p>
+                                ) : null}
+                            </div>
+                            <div>
+                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Approved by</p>
+                                {purchase.approved_by ? (
+                                    <p className="mt-0.5 text-[11px] font-medium text-gray-700 print:text-black">{purchase.approved_by}</p>
+                                ) : null}
+                            </div>
+                        </section>
+
+                        <footer className="mt-4">
+                            <div className="border-t border-gray-200 print:border-gray-600" />
+                            <div className="relative mt-2">
+                                <p className="text-center text-[10px] text-gray-400 print:text-gray-800">
+                                    Thank you for your business.
                                 </p>
-                            ) : null}
-                        </div>
-                        <div>
-                            <div className="mb-1 border-b border-gray-400" />
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                                Approved by
-                            </p>
-                            {purchase.approved_by ? (
-                                <p className="mt-0.5 text-xs font-medium text-gray-700">
-                                    {purchase.approved_by}
-                                </p>
-                            ) : null}
-                        </div>
-                    </section>
-
-                    <footer className="mt-6 border-t border-gray-200 pt-4 text-center text-[10px] text-gray-500">
-                        <p>Thank you for your business.</p>
-                    </footer>
+                                <div className="absolute right-0 top-0">
+                                    <PrintBranding />
+                                </div>
+                            </div>
+                        </footer>
+                    </div>
                 </div>
             </div>
         </div>

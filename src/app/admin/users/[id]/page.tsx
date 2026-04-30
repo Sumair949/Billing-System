@@ -1,11 +1,16 @@
-import { ChevronLeft, Mail, Pencil, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Mail, Pencil, Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { requireAdmin, isAdminEmail } from "@/lib/auth";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatAmount, formatDate } from "@/lib/format";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { deriveStatus, type Bill } from "@/lib/supabase/types";
+import { deriveStatus, type Bill, type Purchase } from "@/lib/supabase/types";
+import { adminDeleteBillAction, adminDeletePurchaseAction, adminChangePasswordAction } from "./admin-actions";
+import { AdminDeleteButton } from "./admin-delete-button";
+import { ChangePasswordDialog } from "./change-password-dialog";
+import { AdminUserFlashToast } from "./flash-toast";
 
 type BillRow = Pick<
     Bill,
@@ -15,6 +20,18 @@ type BillRow = Pick<
     | "bill_date"
     | "total_amount"
     | "received_amount"
+    | "created_at"
+>;
+
+type PurchaseRow = Pick<
+    Purchase,
+    | "id"
+    | "purchase_no"
+    | "supplier_name"
+    | "purchase_date"
+    | "total_amount"
+    | "paid_amount"
+    | "status"
     | "created_at"
 >;
 
@@ -33,12 +50,19 @@ export default async function AdminUserDetailPage({
 
     const admin = createSupabaseAdminClient();
 
-    const [userRes, billsRes] = await Promise.all([
+    const [userRes, billsRes, purchasesRes] = await Promise.all([
         admin.auth.admin.getUserById(id),
         admin
             .from("bills")
             .select(
                 "id, bill_no, customer_name, bill_date, total_amount, received_amount, created_at",
+            )
+            .eq("user_id", id)
+            .order("created_at", { ascending: false }),
+        admin
+            .from("purchases")
+            .select(
+                "id, purchase_no, supplier_name, purchase_date, total_amount, paid_amount, status, created_at",
             )
             .eq("user_id", id)
             .order("created_at", { ascending: false }),
@@ -50,22 +74,39 @@ export default async function AdminUserDetailPage({
 
     const user = userRes.data.user;
     const bills = (billsRes.data ?? []) as BillRow[];
+    const purchases = (purchasesRes.data ?? []) as PurchaseRow[];
     const isAdmin = isAdminEmail(user.email);
     const shopName = readShopName(user.user_metadata);
 
-    const totalRevenue = bills.reduce(
-        (sum, b) => sum + (Number(b.total_amount) || 0),
-        0,
-    );
-    const outstanding = bills.reduce(
+    const billRevenue = bills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+    const billOutstanding = bills.reduce(
         (sum, b) =>
-            sum +
-            Math.max(0, (Number(b.total_amount) || 0) - (Number(b.received_amount) || 0)),
+            sum + Math.max(0, (Number(b.total_amount) || 0) - (Number(b.received_amount) || 0)),
         0,
     );
 
+    const purchaseSpend = purchases.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0);
+    const purchasePayable = purchases.reduce(
+        (sum, p) =>
+            sum + Math.max(0, (Number(p.total_amount) || 0) - (Number(p.paid_amount) || 0)),
+        0,
+    );
+
+    async function changePasswordAction(
+        state: Awaited<ReturnType<typeof adminChangePasswordAction>>,
+        formData: FormData,
+    ) {
+        "use server";
+        return adminChangePasswordAction(id, state, formData);
+    }
+
     return (
         <section className="space-y-8">
+            <Suspense>
+                <AdminUserFlashToast />
+            </Suspense>
+
+            {/* Header */}
             <div>
                 <Link
                     href="/admin"
@@ -96,38 +137,57 @@ export default async function AdminUserDetailPage({
                             {user.email}
                         </p>
                     </div>
+
+                    {/* Admin controls */}
                     {isAdmin ? null : (
-                        <Link
-                            href={`/admin/users/${user.id}/edit`}
-                            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
-                        >
-                            <Pencil className="h-4 w-4" aria-hidden />
-                            Edit shop info
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <ChangePasswordDialog action={changePasswordAction} />
+                            <Link
+                                href={`/admin/users/${user.id}/edit`}
+                                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                            >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                                Edit shop info
+                            </Link>
+                        </div>
                     )}
                 </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            {/* Stats */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard label="Total bills" value={bills.length.toLocaleString()} />
-                <StatCard label="Total revenue" value={formatAmount(totalRevenue)} />
+                <StatCard label="Bill revenue" value={formatAmount(billRevenue)} />
                 <StatCard
-                    label="Outstanding"
-                    value={formatAmount(outstanding)}
-                    emphasis={outstanding > 0 ? "warning" : undefined}
+                    label="Bills outstanding"
+                    value={formatAmount(billOutstanding)}
+                    emphasis={billOutstanding > 0 ? "warning" : undefined}
+                />
+                <StatCard
+                    label="Purchases payable"
+                    value={formatAmount(purchasePayable)}
+                    emphasis={purchasePayable > 0 ? "warning" : undefined}
                 />
             </div>
 
+            {/* Bills */}
             <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
-                <div className="border-b border-border p-5">
-                    <h2 className="text-base font-semibold text-foreground">
-                        Bills (read-only)
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                        {bills.length === 0
-                            ? "This user has no bills yet."
-                            : `${bills.length.toLocaleString()} record${bills.length === 1 ? "" : "s"}`}
-                    </p>
+                <div className="flex items-center justify-between border-b border-border p-5">
+                    <div>
+                        <h2 className="text-base font-semibold text-foreground">Bills</h2>
+                        <p className="text-xs text-muted-foreground">
+                            {bills.length === 0
+                                ? "No bills yet."
+                                : `${bills.length.toLocaleString()} record${bills.length === 1 ? "" : "s"} · Rs ${formatAmount(billRevenue)} total`}
+                        </p>
+                    </div>
+                    <Link
+                        href={`/admin/users/${id}/bills/new`}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                    >
+                        <Plus className="h-4 w-4" aria-hidden />
+                        New bill
+                    </Link>
                 </div>
 
                 {bills.length === 0 ? (
@@ -142,21 +202,17 @@ export default async function AdminUserDetailPage({
                                     <th className="px-6 py-3.5 font-semibold">Bill no.</th>
                                     <th className="px-6 py-3.5 font-semibold">Customer</th>
                                     <th className="px-6 py-3.5 font-semibold">Date</th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Total
-                                    </th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Pending
-                                    </th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Total</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Pending</th>
                                     <th className="px-6 py-3.5 font-semibold">Status</th>
+                                    <th className="px-6 py-3.5 font-semibold">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {bills.map((bill) => {
                                     const pending = Math.max(
                                         0,
-                                        Number(bill.total_amount) -
-                                            Number(bill.received_amount),
+                                        Number(bill.total_amount) - Number(bill.received_amount),
                                     );
                                     return (
                                         <tr key={bill.id} className="hover:bg-muted/40">
@@ -175,15 +231,129 @@ export default async function AdminUserDetailPage({
                                             <td
                                                 className={[
                                                     "px-6 py-4 text-right font-mono font-semibold tabular-nums",
-                                                    pending > 0
-                                                        ? "text-amber-700"
-                                                        : "text-muted-foreground",
+                                                    pending > 0 ? "text-amber-700" : "text-muted-foreground",
                                                 ].join(" ")}
                                             >
                                                 {formatAmount(pending)}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <StatusBadge status={deriveStatus(bill)} />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-4">
+                                                    <Link
+                                                        href={`/admin/users/${id}/bills/${bill.id}/edit`}
+                                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                                        Edit
+                                                    </Link>
+                                                    <AdminDeleteButton
+                                                        label="Delete this bill?"
+                                                        description={`Bill ${bill.bill_no} will be permanently removed. This cannot be undone.`}
+                                                        action={async () => {
+                                                            "use server";
+                                                            await adminDeleteBillAction(id, bill.id);
+                                                        }}
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Purchases */}
+            <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
+                <div className="flex items-center justify-between border-b border-border p-5">
+                    <div>
+                        <h2 className="text-base font-semibold text-foreground">Purchases</h2>
+                        <p className="text-xs text-muted-foreground">
+                            {purchases.length === 0
+                                ? "No purchases yet."
+                                : `${purchases.length.toLocaleString()} record${purchases.length === 1 ? "" : "s"} · Rs ${formatAmount(purchaseSpend)} total spend`}
+                        </p>
+                    </div>
+                    <Link
+                        href={`/admin/users/${id}/purchases/new`}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                    >
+                        <Plus className="h-4 w-4" aria-hidden />
+                        New purchase
+                    </Link>
+                </div>
+
+                {purchases.length === 0 ? (
+                    <div className="p-16 text-center text-sm text-muted-foreground">
+                        Nothing to show yet.
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                                <tr>
+                                    <th className="px-6 py-3.5 font-semibold">Purchase no.</th>
+                                    <th className="px-6 py-3.5 font-semibold">Supplier</th>
+                                    <th className="px-6 py-3.5 font-semibold">Date</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Total</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Payable</th>
+                                    <th className="px-6 py-3.5 font-semibold">Status</th>
+                                    <th className="px-6 py-3.5 font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {purchases.map((purchase) => {
+                                    const payable = Math.max(
+                                        0,
+                                        Number(purchase.total_amount) - Number(purchase.paid_amount),
+                                    );
+                                    return (
+                                        <tr key={purchase.id} className="hover:bg-muted/40">
+                                            <td className="px-6 py-4 font-mono text-[13px] font-semibold text-foreground">
+                                                {purchase.purchase_no}
+                                            </td>
+                                            <td className="px-6 py-4 text-foreground/85">
+                                                {purchase.supplier_name}
+                                            </td>
+                                            <td className="px-6 py-4 text-muted-foreground">
+                                                {formatDate(purchase.purchase_date)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono font-semibold tabular-nums">
+                                                {formatAmount(purchase.total_amount)}
+                                            </td>
+                                            <td
+                                                className={[
+                                                    "px-6 py-4 text-right font-mono font-semibold tabular-nums",
+                                                    payable > 0 ? "text-amber-700" : "text-muted-foreground",
+                                                ].join(" ")}
+                                            >
+                                                {formatAmount(payable)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <StatusBadge status={purchase.status} />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-4">
+                                                    <Link
+                                                        href={`/admin/users/${id}/purchases/${purchase.id}/edit`}
+                                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                                        Edit
+                                                    </Link>
+                                                    <AdminDeleteButton
+                                                        label="Delete this purchase?"
+                                                        description={`Purchase ${purchase.purchase_no} will be permanently removed. This cannot be undone.`}
+                                                        action={async () => {
+                                                            "use server";
+                                                            await adminDeletePurchaseAction(id, purchase.id);
+                                                        }}
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -215,9 +385,7 @@ function StatCard({
     return (
         <div className={`rounded-lg p-5 shadow-sm ${bg}`}>
             <p className={`text-sm font-medium ${labelColor}`}>{label}</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-                {value}
-            </p>
+            <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
         </div>
     );
 }

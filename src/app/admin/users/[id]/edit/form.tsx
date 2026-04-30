@@ -20,6 +20,8 @@ type Props = {
         shop_address: string;
         shop_phone: string;
         shop_email: string;
+        shop_ntn: string;
+        shop_stn: string;
     };
 };
 
@@ -87,6 +89,35 @@ export function ShopInfoForm({ action, cancelHref, defaultValues }: Props) {
                     aria-invalid={state.fieldErrors?.shop_email ? true : undefined}
                 />
                 <FieldError message={state.fieldErrors?.shop_email} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="shop_ntn">NTN</Label>
+                    <Input
+                        id="shop_ntn"
+                        name="shop_ntn"
+                        type="text"
+                        maxLength={50}
+                        defaultValue={defaultValues.shop_ntn}
+                        placeholder="1234567-8"
+                        aria-invalid={state.fieldErrors?.shop_ntn ? true : undefined}
+                    />
+                    <FieldError message={state.fieldErrors?.shop_ntn} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="shop_stn">STN</Label>
+                    <Input
+                        id="shop_stn"
+                        name="shop_stn"
+                        type="text"
+                        maxLength={50}
+                        defaultValue={defaultValues.shop_stn}
+                        placeholder="12-34-5678-001-56"
+                        aria-invalid={state.fieldErrors?.shop_stn ? true : undefined}
+                    />
+                    <FieldError message={state.fieldErrors?.shop_stn} />
+                </div>
             </div>
 
             {state.error ? (

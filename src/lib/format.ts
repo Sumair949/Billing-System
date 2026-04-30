@@ -1,7 +1,7 @@
 export const CURRENCY_SYMBOL = "Rs";
 
 const amountFormatter = new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
 });
 

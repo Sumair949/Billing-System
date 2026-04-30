@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatAmount } from "@/lib/format";
 import { SupplierPurchasesModal } from "./supplier-purchases-modal";
+import { RecordPaymentModal } from "./record-payment-modal";
 import { PayablesFilters } from "./filters";
 
 type RpcRow = {
@@ -202,6 +203,10 @@ export default async function PayablesPage({
                                                     <SupplierPurchasesModal
                                                         supplierName={r.supplier_name}
                                                         payableAmount={formatAmount(r.payable_amount)}
+                                                    />
+                                                    <RecordPaymentModal
+                                                        supplierName={r.supplier_name}
+                                                        payableAmount={r.payable_amount}
                                                     />
                                                     <Link
                                                         href={`/print/payables-ledger/${encodeURIComponent(r.supplier_name)}`}

@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { updateShopInfoAction, type UpdateShopFormState } from "../../../actions";
+import { adminUploadWatermarkAction, adminRemoveWatermarkAction } from "../admin-actions";
 import { ShopInfoForm } from "./form";
+import { WatermarkSection } from "./watermark-section";
 
 function readMetaString(
     meta: Record<string, unknown> | undefined,
@@ -34,6 +36,18 @@ export default async function AdminEditShopPage({
         return updateShopInfoAction(id, state, formData);
     }
 
+    async function uploadWatermark(formData: FormData) {
+        "use server";
+        return adminUploadWatermarkAction(id, formData);
+    }
+
+    async function removeWatermark() {
+        "use server";
+        return adminRemoveWatermarkAction(id);
+    }
+
+    const currentWatermarkUrl = readMetaString(meta, "shop_watermark_url") || null;
+
     return (
         <section className="space-y-6">
             <div>
@@ -52,7 +66,7 @@ export default async function AdminEditShopPage({
                 </p>
             </div>
 
-            <div className="max-w-xl">
+            <div className="max-w-xl space-y-6">
                 <ShopInfoForm
                     action={action}
                     cancelHref={`/admin/users/${id}`}
@@ -61,7 +75,15 @@ export default async function AdminEditShopPage({
                         shop_address: readMetaString(meta, "shop_address"),
                         shop_phone: readMetaString(meta, "shop_phone"),
                         shop_email: readMetaString(meta, "shop_email"),
+                        shop_ntn: readMetaString(meta, "shop_ntn"),
+                        shop_stn: readMetaString(meta, "shop_stn"),
                     }}
+                />
+
+                <WatermarkSection
+                    currentUrl={currentWatermarkUrl}
+                    uploadAction={uploadWatermark}
+                    removeAction={removeWatermark}
                 />
             </div>
         </section>
