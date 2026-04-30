@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { formatDate } from "@/lib/format";
 import { readShopInfo } from "@/lib/shop";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PrintBranding } from "@/components/print-branding";
 import { PayablesLedgerTable, type PayablesLedgerRow } from "./ledger-table";
 import { PrintActions } from "./print-actions";
 
@@ -94,9 +93,9 @@ export default async function PrintPayablesLedgerPage({
             `}</style>
 
             <div className="mx-auto max-w-4xl px-6 print:max-w-none print:px-0">
-                <PrintActions filename={`Payables-Ledger-${supplierName}`} />
+                <PrintActions filename={`Payables-Ledger-${supplierName}`} format="a4" />
 
-                <div className="relative flex flex-col rounded-lg bg-white text-gray-900 shadow-md ring-1 ring-gray-200 print:min-h-[29cm] print:rounded-none print:shadow-none print:ring-0">
+                <div id="print-card" className="relative flex flex-col rounded-lg bg-white text-gray-900 shadow-md ring-1 ring-gray-200 print:min-h-[29cm] print:rounded-none print:shadow-none print:ring-0">
                     {shop.watermark_url ? (
                         <div
                             className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg print:rounded-none"
@@ -125,7 +124,11 @@ export default async function PrintPayablesLedgerPage({
                                     </p>
                                 ) : null}
                                 <p className="mt-0.5 text-[11px] text-gray-500 print:text-gray-800">
-                                    NTN: {shop.ntn ?? "—"} &nbsp;·&nbsp; STN: {shop.stn ?? "—"}
+                                    NTN: {shop.ntn ?? (
+                                        <span className="inline-block w-28 border-b border-gray-300 align-bottom print:border-gray-600">&nbsp;</span>
+                                    )} &nbsp;·&nbsp; STN: {shop.stn ?? (
+                                        <span className="inline-block w-28 border-b border-gray-300 align-bottom print:border-gray-600">&nbsp;</span>
+                                    )}
                                 </p>
                                 <p className="mt-1 text-[10px] text-gray-400 print:text-gray-700">Supplier Account Statement</p>
                             </div>
@@ -164,14 +167,9 @@ export default async function PrintPayablesLedgerPage({
 
                         <footer className="mt-4">
                             <div className="border-t border-gray-200 print:border-gray-600" />
-                            <div className="relative mt-2">
-                                <p className="text-center text-[10px] text-gray-400 print:text-gray-800">
-                                    This is a system-generated statement. Thank you for your business.
-                                </p>
-                                <div className="absolute right-0 top-0">
-                                    <PrintBranding />
-                                </div>
-                            </div>
+                            <p className="mt-2 text-center text-[10px] text-gray-400 print:text-gray-800">
+                                This is a system-generated statement. Thank you for your business.
+                            </p>
                         </footer>
                     </div>
                 </div>

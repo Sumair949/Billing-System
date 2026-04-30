@@ -2,7 +2,13 @@
 
 import { ChevronLeft, Download, Printer } from "lucide-react";
 
-export function PrintActions({ filename }: { filename?: string }) {
+export function PrintActions({
+    filename,
+    format = "a4",
+}: {
+    filename?: string;
+    format?: "a5" | "a4";
+}) {
     function handleDone() {
         window.close();
         window.setTimeout(() => {
@@ -10,13 +16,52 @@ export function PrintActions({ filename }: { filename?: string }) {
         }, 50);
     }
 
-    function handleDownload() {
-        const prev = document.title;
-        if (filename) document.title = filename;
-        window.print();
-        window.setTimeout(() => {
-            document.title = prev;
-        }, 500);
+    async function handleDownload() {
+        const card = document.getElementById("print-card");
+        if (!card) return;
+
+        const originalMinHeight = card.style.minHeight;
+        const widthPx = card.offsetWidth;
+        const ratio = format === "a5" ? 210 / 148 : 297 / 210;
+        card.style.minHeight = `${widthPx * ratio}px`;
+
+        try {
+            const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+                import("html2canvas-pro"),
+                import("jspdf"),
+            ]);
+
+            const canvas = await html2canvas(card, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff",
+            });
+
+            const imgData = canvas.toDataURL("image/jpeg", 0.95);
+            const pdf = new jsPDF({ unit: "mm", format, orientation: "portrait" });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+            if (imgHeight <= pageHeight + 1) {
+                pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, Math.min(imgHeight, pageHeight));
+            } else {
+                let heightLeft = imgHeight;
+                let position = 0;
+                pdf.addImage(imgData, "JPEG", 0, position, pageWidth, imgHeight);
+                heightLeft -= pageHeight;
+                while (heightLeft > 1) {
+                    position -= pageHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, "JPEG", 0, position, pageWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+            }
+
+            pdf.save(filename ? `${filename}.pdf` : "document.pdf");
+        } finally {
+            card.style.minHeight = originalMinHeight;
+        }
     }
 
     return (
