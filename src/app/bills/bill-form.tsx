@@ -50,6 +50,7 @@ type Props = {
         total_amount?: string;
         freight_charges?: string;
         loading_charges?: string;
+        labour_charges?: string;
         discount?: string;
         prepared_by?: string;
         approved_by?: string;
@@ -85,6 +86,7 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
     const [billDate, setBillDate] = useState(defaultValues?.bill_date ?? todayIso());
     const [freightCharges, setFreightCharges] = useState(defaultValues?.freight_charges ?? "");
     const [loadingCharges, setLoadingCharges] = useState(defaultValues?.loading_charges ?? "");
+    const [labourCharges, setLabourCharges] = useState(defaultValues?.labour_charges ?? "");
     const [discount, setDiscount] = useState(defaultValues?.discount ?? "");
     const [preparedBy, setPreparedBy] = useState(defaultValues?.prepared_by ?? "");
     const [approvedBy, setApprovedBy] = useState(defaultValues?.approved_by ?? "");
@@ -108,10 +110,11 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
         return (
             itemsSum +
             safeNumber(zeroIfBlank(freightCharges)) +
-            safeNumber(zeroIfBlank(loadingCharges)) -
+            safeNumber(zeroIfBlank(loadingCharges)) +
+            safeNumber(zeroIfBlank(labourCharges)) -
             safeNumber(zeroIfBlank(discount))
         );
-    }, [items, freightCharges, loadingCharges, discount]);
+    }, [items, freightCharges, loadingCharges, labourCharges, discount]);
 
     const [totalOverride, setTotalOverride] = useState<string | null>(() => {
         if (defaultValues?.total_amount === undefined) return null;
@@ -125,7 +128,8 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
                 return sum + (w > 0 ? w : q) * r;
             }, 0) +
             safeNumber(zeroIfBlank(defaultValues.freight_charges)) +
-            safeNumber(zeroIfBlank(defaultValues.loading_charges)) -
+            safeNumber(zeroIfBlank(defaultValues.loading_charges)) +
+            safeNumber(zeroIfBlank(defaultValues.labour_charges)) -
             safeNumber(zeroIfBlank(defaultValues.discount));
         return Math.abs(n - initialAuto) < 0.005 ? null : defaultValues.total_amount;
     });
@@ -364,7 +368,7 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
                 title="Charges & discount"
                 description="Add freight, loading charges, or a discount. These adjust the auto-total."
             >
-                <div className="grid gap-5 sm:grid-cols-3">
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="space-y-2">
                         <Label htmlFor="freight_charges">Freight charges</Label>
                         <div className="flex h-11 items-center rounded-md ring-1 ring-border focus-within:ring-2 focus-within:ring-ring">
@@ -381,7 +385,7 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
                                 onFocus={(e) => e.target.select()}
                                 aria-invalid={state.fieldErrors?.freight_charges ? true : undefined}
                                 placeholder="0.00"
-                                className="h-full border-none bg-transparent px-0 font-mono focus-visible:ring-0"
+                                className="h-full border-0 rounded-none bg-transparent px-0 font-mono focus-visible:ring-0"
                             />
                         </div>
                         <FieldError message={state.fieldErrors?.freight_charges} />
@@ -402,10 +406,31 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
                                 onFocus={(e) => e.target.select()}
                                 aria-invalid={state.fieldErrors?.loading_charges ? true : undefined}
                                 placeholder="0.00"
-                                className="h-full border-none bg-transparent px-0 font-mono focus-visible:ring-0"
+                                className="h-full border-0 rounded-none bg-transparent px-0 font-mono focus-visible:ring-0"
                             />
                         </div>
                         <FieldError message={state.fieldErrors?.loading_charges} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="labour_charges">Labour charges</Label>
+                        <div className="flex h-11 items-center rounded-md ring-1 ring-border focus-within:ring-2 focus-within:ring-ring">
+                            <span className="px-3 font-mono text-sm text-muted-foreground">
+                                {CURRENCY_SYMBOL}
+                            </span>
+                            <Input
+                                id="labour_charges"
+                                name="labour_charges"
+                                type="text"
+                                inputMode="decimal"
+                                value={labourCharges}
+                                onChange={(e) => setLabourCharges(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                aria-invalid={state.fieldErrors?.labour_charges ? true : undefined}
+                                placeholder="0.00"
+                                className="h-full border-0 rounded-none bg-transparent px-0 font-mono focus-visible:ring-0"
+                            />
+                        </div>
+                        <FieldError message={state.fieldErrors?.labour_charges} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="discount">Discount</Label>
@@ -423,7 +448,7 @@ export function BillForm({ action, submitLabel, defaultValues }: Props) {
                                 onFocus={(e) => e.target.select()}
                                 aria-invalid={state.fieldErrors?.discount ? true : undefined}
                                 placeholder="0.00"
-                                className="h-full border-none bg-transparent px-0 font-mono focus-visible:ring-0"
+                                className="h-full border-0 rounded-none bg-transparent px-0 font-mono focus-visible:ring-0"
                             />
                         </div>
                         <FieldError message={state.fieldErrors?.discount} />

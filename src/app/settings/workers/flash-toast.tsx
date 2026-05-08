@@ -5,12 +5,12 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 const MESSAGES: Record<string, { message: string; type: "success" | "info" }> = {
+    "worker-created": { message: "Worker created.", type: "success" },
     "worker-enabled": { message: "Worker enabled.", type: "success" },
     "worker-disabled": { message: "Worker disabled.", type: "info" },
-    "worker-deleted": { message: "Worker deleted.", type: "info" },
 };
 
-export function AdminUserFlashToast() {
+export function WorkersFlashToast() {
     const searchParams = useSearchParams();
     const pathname = usePathname();
     const router = useRouter();

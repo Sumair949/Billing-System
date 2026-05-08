@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { formatDate } from "@/lib/format";
-import { readShopInfo } from "@/lib/shop";
+import { groupValuesBy } from "@/lib/group-by";
+import { fetchShopInfo } from "@/lib/shop";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PayablesLedgerTable, type PayablesLedgerRow } from "./ledger-table";
 import { PrintActions } from "./print-actions";
@@ -37,7 +38,7 @@ export default async function PrintPayablesLedgerPage({
     }
 
     const purchases = purchasesRes.data;
-    const shop = readShopInfo(userRes.data.user?.user_metadata);
+    const shop = await fetchShopInfo(userRes.data.user ?? null);
 
     const purchaseIds = purchases.map((p) => p.id);
     const { data: allItems } = await supabase
@@ -47,12 +48,7 @@ export default async function PrintPayablesLedgerPage({
         .order("purchase_id")
         .order("sr_no");
 
-    const descsByPurchase = new Map<string, string[]>();
-    for (const item of allItems ?? []) {
-        const arr = descsByPurchase.get(item.purchase_id) ?? [];
-        arr.push(item.description);
-        descsByPurchase.set(item.purchase_id, arr);
-    }
+    const descsByPurchase = groupValuesBy(allItems ?? [], "purchase_id", (item) => item.description);
 
     const purchaseRows: PayablesLedgerRow[] = purchases.map((p) => ({
         id: p.id,
@@ -154,15 +150,15 @@ export default async function PrintPayablesLedgerPage({
 
                         <div className="flex-1 py-4" />
 
-                        <section className="grid grid-cols-2 gap-8">
-                            <div>
-                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Prepared by</p>
-                            </div>
-                            <div>
-                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Supplier signature</p>
-                            </div>
+                        <section className="flex justify-between text-[11px] text-gray-600 print:text-gray-900">
+                            <p>
+                                <span className="font-semibold text-gray-700 print:text-black">Prepared By:</span>
+                                <span className="inline-block w-32">&nbsp;</span>
+                            </p>
+                            <p>
+                                <span className="font-semibold text-gray-700 print:text-black">Supplier Signature:</span>
+                                <span className="inline-block w-32">&nbsp;</span>
+                            </p>
                         </section>
 
                         <footer className="mt-4">

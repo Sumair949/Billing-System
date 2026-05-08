@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { CURRENCY_SYMBOL, formatAmountPlain, formatDate } from "@/lib/format";
-import { readShopInfo } from "@/lib/shop";
+import { fetchShopInfo } from "@/lib/shop";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PrintActions } from "./print-actions";
 
@@ -41,7 +41,7 @@ export default async function PrintPurchasePage({
 
     const purchase = purchaseRes.data;
     const items = (itemsRes.data ?? []) as ItemRow[];
-    const shop = readShopInfo(userRes.data.user?.user_metadata);
+    const shop = await fetchShopInfo(userRes.data.user ?? null);
     const payable = Math.max(
         0,
         Number(purchase.total_amount) - Number(purchase.paid_amount),
@@ -194,21 +194,15 @@ export default async function PrintPurchasePage({
 
                         <div className="flex-1 py-4" />
 
-                        <section className="grid grid-cols-2 gap-8">
-                            <div>
-                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Prepared by</p>
-                                {purchase.prepared_by ? (
-                                    <p className="mt-0.5 text-[11px] font-medium text-gray-700 print:text-black">{purchase.prepared_by}</p>
-                                ) : null}
-                            </div>
-                            <div>
-                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Approved by</p>
-                                {purchase.approved_by ? (
-                                    <p className="mt-0.5 text-[11px] font-medium text-gray-700 print:text-black">{purchase.approved_by}</p>
-                                ) : null}
-                            </div>
+                        <section className="flex justify-between text-[11px] text-gray-600 print:text-gray-900">
+                            <p>
+                                <span className="font-semibold text-gray-700 print:text-black">Prepared By:</span>
+                                {purchase.prepared_by ? ` ${purchase.prepared_by}` : ""}
+                            </p>
+                            <p>
+                                <span className="font-semibold text-gray-700 print:text-black">Approved By:</span>
+                                {purchase.approved_by ? ` ${purchase.approved_by}` : ""}
+                            </p>
                         </section>
 
                         <footer className="mt-4">

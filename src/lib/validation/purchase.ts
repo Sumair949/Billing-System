@@ -80,6 +80,10 @@ function chargeSchema(label: string) {
                 ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label} must be zero or greater.` });
                 return z.NEVER;
             }
+            if (num > 9_999_999) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label} is too large.` });
+                return z.NEVER;
+            }
             return str;
         });
 }
@@ -112,8 +116,8 @@ export const purchaseSchema = z
     .object({
         supplier_name: z.string().trim().min(1, "Supplier name is required").max(200, "Supplier name is too long"),
         purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date (YYYY-MM-DD)"),
-        total_amount: decimalSchema({ maxDecimals: 2, label: "Total amount" }),
-        paid_amount: decimalSchema({ maxDecimals: 2, label: "Paid amount" }),
+        total_amount: decimalSchema({ max: 999_999_999, maxDecimals: 2, label: "Total amount" }),
+        paid_amount: decimalSchema({ max: 999_999_999, maxDecimals: 2, label: "Paid amount" }),
         freight_charges: chargeSchema("Freight charges"),
         loading_charges: chargeSchema("Loading charges"),
         discount: chargeSchema("Discount"),

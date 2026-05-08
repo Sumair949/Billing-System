@@ -1,46 +1,37 @@
-import { ChevronLeft, Mail, Pencil, Plus, ShieldCheck } from "lucide-react";
+import { Ban, ChevronLeft, Mail } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { requireAdmin, isAdminEmail } from "@/lib/auth";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { formatAmount, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { deriveStatus, type Bill, type Purchase } from "@/lib/supabase/types";
-import { adminDeleteBillAction, adminDeletePurchaseAction, adminChangePasswordAction } from "./admin-actions";
-import { AdminDeleteButton } from "./admin-delete-button";
+import { adminChangePasswordAction, type ChangePasswordFormState } from "./admin-actions";
 import { ChangePasswordDialog } from "./change-password-dialog";
 import { AdminUserFlashToast } from "./flash-toast";
+import { ToggleUserButton } from "@/app/admin/toggle-user-button";
+import { DeleteWorkerButton } from "./delete-worker-button";
+import { ToggleWorkerButton } from "./toggle-worker-button";
 
-type BillRow = Pick<
-    Bill,
-    | "id"
-    | "bill_no"
-    | "customer_name"
-    | "bill_date"
-    | "total_amount"
-    | "received_amount"
-    | "created_at"
->;
-
-type PurchaseRow = Pick<
-    Purchase,
-    | "id"
-    | "purchase_no"
-    | "supplier_name"
-    | "purchase_date"
-    | "total_amount"
-    | "paid_amount"
-    | "status"
-    | "created_at"
->;
+function isBanned(bannedUntil: string | null | undefined): boolean {
+    if (!bannedUntil) return false;
+    const ts = Date.parse(bannedUntil);
+    return Number.isFinite(ts) && ts > Date.now();
+}
 
 function readShopName(meta: Record<string, unknown> | undefined): string {
     const v = meta?.shop_name;
     return typeof v === "string" ? v : "";
 }
 
-export default async function AdminUserDetailPage({
+type WorkerRow = {
+    id: string;
+    worker_user_id: string;
+    display_name: string;
+    is_active: boolean;
+    created_at: string;
+};
+
+export default async function AdminShopDetailPage({
     params,
 }: {
     params: Promise<{ id: string }>;
@@ -50,50 +41,37 @@ export default async function AdminUserDetailPage({
 
     const admin = createSupabaseAdminClient();
 
-    const [userRes, billsRes, purchasesRes] = await Promise.all([
+    const [userRes, workersDbRes] = await Promise.all([
         admin.auth.admin.getUserById(id),
         admin
-            .from("bills")
-            .select(
-                "id, bill_no, customer_name, bill_date, total_amount, received_amount, created_at",
-            )
-            .eq("user_id", id)
-            .order("created_at", { ascending: false }),
-        admin
-            .from("purchases")
-            .select(
-                "id, purchase_no, supplier_name, purchase_date, total_amount, paid_amount, status, created_at",
-            )
-            .eq("user_id", id)
-            .order("created_at", { ascending: false }),
+            .from("shop_workers")
+            .select("id, worker_user_id, display_name, is_active, created_at")
+            .eq("owner_id", id)
+            .order("created_at", { ascending: true }),
     ]);
 
-    if (userRes.error || !userRes.data.user) {
-        notFound();
-    }
+    if (userRes.error || !userRes.data.user) notFound();
 
     const user = userRes.data.user;
-    const bills = (billsRes.data ?? []) as BillRow[];
-    const purchases = (purchasesRes.data ?? []) as PurchaseRow[];
-    const isAdmin = isAdminEmail(user.email);
+    if (isAdminEmail(user.email)) notFound();
+
     const shopName = readShopName(user.user_metadata);
+    const ownerDisabled = isBanned((user as { banned_until?: string | null }).banned_until);
 
-    const billRevenue = bills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-    const billOutstanding = bills.reduce(
-        (sum, b) =>
-            sum + Math.max(0, (Number(b.total_amount) || 0) - (Number(b.received_amount) || 0)),
-        0,
+    const workers = (workersDbRes.data ?? []) as WorkerRow[];
+
+    const workerAuthResults = await Promise.all(
+        workers.map((w) => admin.auth.admin.getUserById(w.worker_user_id)),
+    );
+    const workerAuthMap = new Map(
+        workerAuthResults
+            .map((r) => r.data?.user)
+            .filter((u): u is NonNullable<typeof u> => !!u)
+            .map((u) => [u.id, u]),
     );
 
-    const purchaseSpend = purchases.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0);
-    const purchasePayable = purchases.reduce(
-        (sum, p) =>
-            sum + Math.max(0, (Number(p.total_amount) || 0) - (Number(p.paid_amount) || 0)),
-        0,
-    );
-
-    async function changePasswordAction(
-        state: Awaited<ReturnType<typeof adminChangePasswordAction>>,
+    async function changeOwnerPw(
+        state: ChangePasswordFormState,
         formData: FormData,
     ) {
         "use server";
@@ -113,11 +91,11 @@ export default async function AdminUserDetailPage({
                     className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                     <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                    Back to users
+                    Back to shops
                 </Link>
                 <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
                                 {shopName || (
                                     <span className="italic text-muted-foreground">
@@ -125,10 +103,10 @@ export default async function AdminUserDetailPage({
                                     </span>
                                 )}
                             </h1>
-                            {isAdmin ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-200">
-                                    <ShieldCheck className="h-3.5 w-3.5" />
-                                    Admin
+                            {ownerDisabled ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                    <Ban className="h-3.5 w-3.5" />
+                                    Disabled
                                 </span>
                             ) : null}
                         </div>
@@ -138,220 +116,103 @@ export default async function AdminUserDetailPage({
                         </p>
                     </div>
 
-                    {/* Admin controls */}
-                    {isAdmin ? null : (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <ChangePasswordDialog action={changePasswordAction} />
-                            <Link
-                                href={`/admin/users/${user.id}/edit`}
-                                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
-                            >
-                                <Pencil className="h-4 w-4" aria-hidden />
-                                Edit shop info
-                            </Link>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Total bills" value={bills.length.toLocaleString()} />
-                <StatCard label="Bill revenue" value={formatAmount(billRevenue)} />
-                <StatCard
-                    label="Bills outstanding"
-                    value={formatAmount(billOutstanding)}
-                    emphasis={billOutstanding > 0 ? "warning" : undefined}
-                />
-                <StatCard
-                    label="Purchases payable"
-                    value={formatAmount(purchasePayable)}
-                    emphasis={purchasePayable > 0 ? "warning" : undefined}
-                />
-            </div>
-
-            {/* Bills */}
-            <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
-                <div className="flex items-center justify-between border-b border-border p-5">
-                    <div>
-                        <h2 className="text-base font-semibold text-foreground">Bills</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {bills.length === 0
-                                ? "No bills yet."
-                                : `${bills.length.toLocaleString()} record${bills.length === 1 ? "" : "s"} · Rs ${formatAmount(billRevenue)} total`}
-                        </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <ChangePasswordDialog action={changeOwnerPw} />
+                        <ToggleUserButton
+                            userId={user.id}
+                            email={user.email ?? ""}
+                            shopName={shopName}
+                            disabled={ownerDisabled}
+                        />
                     </div>
-                    <Link
-                        href={`/admin/users/${id}/bills/new`}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
-                    >
-                        <Plus className="h-4 w-4" aria-hidden />
-                        New bill
-                    </Link>
+                </div>
+            </div>
+
+            {/* Workers */}
+            <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
+                <div className="border-b border-border p-5">
+                    <h2 className="text-base font-semibold text-foreground">Workers</h2>
+                    <p className="text-xs text-muted-foreground">
+                        {workers.length === 0
+                            ? "No workers assigned to this shop."
+                            : `${workers.length} worker${workers.length === 1 ? "" : "s"}`}
+                    </p>
                 </div>
 
-                {bills.length === 0 ? (
+                {workers.length === 0 ? (
                     <div className="p-16 text-center text-sm text-muted-foreground">
-                        Nothing to show yet.
+                        No workers yet.
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                                 <tr>
-                                    <th className="px-6 py-3.5 font-semibold">Bill no.</th>
-                                    <th className="px-6 py-3.5 font-semibold">Customer</th>
-                                    <th className="px-6 py-3.5 font-semibold">Date</th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">Total</th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">Pending</th>
+                                    <th className="px-6 py-3.5 font-semibold">Display Name</th>
+                                    <th className="px-6 py-3.5 font-semibold">Email</th>
                                     <th className="px-6 py-3.5 font-semibold">Status</th>
-                                    <th className="px-6 py-3.5 font-semibold">Actions</th>
+                                    <th className="px-6 py-3.5 font-semibold">Added</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {bills.map((bill) => {
-                                    const pending = Math.max(
-                                        0,
-                                        Number(bill.total_amount) - Number(bill.received_amount),
+                                {workers.map((w) => {
+                                    const authUser = workerAuthMap.get(w.worker_user_id);
+                                    const workerDisabled = isBanned(
+                                        (authUser as { banned_until?: string | null } | undefined)
+                                            ?.banned_until,
                                     );
+
+                                    async function changeWorkerPw(
+                                        state: ChangePasswordFormState,
+                                        formData: FormData,
+                                    ) {
+                                        "use server";
+                                        return adminChangePasswordAction(
+                                            w.worker_user_id,
+                                            state,
+                                            formData,
+                                        );
+                                    }
+
                                     return (
-                                        <tr key={bill.id} className="hover:bg-muted/40">
-                                            <td className="px-6 py-4 font-mono text-[13px] font-semibold text-foreground">
-                                                {bill.bill_no}
-                                            </td>
-                                            <td className="px-6 py-4 text-foreground/85">
-                                                {bill.customer_name}
+                                        <tr key={w.id} className="hover:bg-muted/40">
+                                            <td className="px-6 py-4 font-medium text-foreground">
+                                                {w.display_name}
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground">
-                                                {formatDate(bill.bill_date)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono font-semibold tabular-nums">
-                                                {formatAmount(bill.total_amount)}
-                                            </td>
-                                            <td
-                                                className={[
-                                                    "px-6 py-4 text-right font-mono font-semibold tabular-nums",
-                                                    pending > 0 ? "text-amber-700" : "text-muted-foreground",
-                                                ].join(" ")}
-                                            >
-                                                {formatAmount(pending)}
+                                                {authUser?.email ?? "—"}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <StatusBadge status={deriveStatus(bill)} />
+                                                {workerDisabled ? (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                                        <Ban className="h-3 w-3" />
+                                                        Disabled
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                                        Active
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-muted-foreground">
+                                                {formatDate(w.created_at)}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-4">
-                                                    <Link
-                                                        href={`/admin/users/${id}/bills/${bill.id}/edit`}
-                                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" aria-hidden />
-                                                        Edit
-                                                    </Link>
-                                                    <AdminDeleteButton
-                                                        label="Delete this bill?"
-                                                        description={`Bill ${bill.bill_no} will be permanently removed. This cannot be undone.`}
-                                                        action={async () => {
-                                                            "use server";
-                                                            await adminDeleteBillAction(id, bill.id);
-                                                        }}
+                                                <div className="flex items-center justify-end gap-4">
+                                                    <ChangePasswordDialog
+                                                        action={changeWorkerPw}
                                                     />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Purchases */}
-            <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
-                <div className="flex items-center justify-between border-b border-border p-5">
-                    <div>
-                        <h2 className="text-base font-semibold text-foreground">Purchases</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {purchases.length === 0
-                                ? "No purchases yet."
-                                : `${purchases.length.toLocaleString()} record${purchases.length === 1 ? "" : "s"} · Rs ${formatAmount(purchaseSpend)} total spend`}
-                        </p>
-                    </div>
-                    <Link
-                        href={`/admin/users/${id}/purchases/new`}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
-                    >
-                        <Plus className="h-4 w-4" aria-hidden />
-                        New purchase
-                    </Link>
-                </div>
-
-                {purchases.length === 0 ? (
-                    <div className="p-16 text-center text-sm text-muted-foreground">
-                        Nothing to show yet.
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                                <tr>
-                                    <th className="px-6 py-3.5 font-semibold">Purchase no.</th>
-                                    <th className="px-6 py-3.5 font-semibold">Supplier</th>
-                                    <th className="px-6 py-3.5 font-semibold">Date</th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">Total</th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">Payable</th>
-                                    <th className="px-6 py-3.5 font-semibold">Status</th>
-                                    <th className="px-6 py-3.5 font-semibold">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {purchases.map((purchase) => {
-                                    const payable = Math.max(
-                                        0,
-                                        Number(purchase.total_amount) - Number(purchase.paid_amount),
-                                    );
-                                    return (
-                                        <tr key={purchase.id} className="hover:bg-muted/40">
-                                            <td className="px-6 py-4 font-mono text-[13px] font-semibold text-foreground">
-                                                {purchase.purchase_no}
-                                            </td>
-                                            <td className="px-6 py-4 text-foreground/85">
-                                                {purchase.supplier_name}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground">
-                                                {formatDate(purchase.purchase_date)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono font-semibold tabular-nums">
-                                                {formatAmount(purchase.total_amount)}
-                                            </td>
-                                            <td
-                                                className={[
-                                                    "px-6 py-4 text-right font-mono font-semibold tabular-nums",
-                                                    payable > 0 ? "text-amber-700" : "text-muted-foreground",
-                                                ].join(" ")}
-                                            >
-                                                {formatAmount(payable)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <StatusBadge status={purchase.status} />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-4">
-                                                    <Link
-                                                        href={`/admin/users/${id}/purchases/${purchase.id}/edit`}
-                                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" aria-hidden />
-                                                        Edit
-                                                    </Link>
-                                                    <AdminDeleteButton
-                                                        label="Delete this purchase?"
-                                                        description={`Purchase ${purchase.purchase_no} will be permanently removed. This cannot be undone.`}
-                                                        action={async () => {
-                                                            "use server";
-                                                            await adminDeletePurchaseAction(id, purchase.id);
-                                                        }}
+                                                    <ToggleWorkerButton
+                                                        ownerId={id}
+                                                        workerId={w.worker_user_id}
+                                                        displayName={w.display_name}
+                                                        disabled={workerDisabled}
+                                                    />
+                                                    <DeleteWorkerButton
+                                                        ownerId={id}
+                                                        workerId={w.worker_user_id}
+                                                        displayName={w.display_name}
                                                     />
                                                 </div>
                                             </td>
@@ -364,28 +225,5 @@ export default async function AdminUserDetailPage({
                 )}
             </div>
         </section>
-    );
-}
-
-function StatCard({
-    label,
-    value,
-    emphasis,
-}: {
-    label: string;
-    value: string;
-    emphasis?: "warning";
-}) {
-    const bg =
-        emphasis === "warning"
-            ? "bg-amber-600 text-white"
-            : "bg-header text-header-foreground";
-    const labelColor =
-        emphasis === "warning" ? "text-white/80" : "text-header-foreground/70";
-    return (
-        <div className={`rounded-lg p-5 shadow-sm ${bg}`}>
-            <p className={`text-sm font-medium ${labelColor}`}>{label}</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
-        </div>
     );
 }

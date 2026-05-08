@@ -111,6 +111,13 @@ function chargeSchema(label: string) {
                 });
                 return z.NEVER;
             }
+            if (num > 9_999_999) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `${label} is too large.`,
+                });
+                return z.NEVER;
+            }
             return str;
         });
 }
@@ -184,10 +191,11 @@ export const billSchema = z
         bill_date: z
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date (YYYY-MM-DD)"),
-        total_amount: decimalSchema({ maxDecimals: 2, label: "Total amount" }),
-        received_amount: decimalSchema({ maxDecimals: 2, label: "Received amount" }),
+        total_amount: decimalSchema({ max: 999_999_999, maxDecimals: 2, label: "Total amount" }),
+        received_amount: decimalSchema({ max: 999_999_999, maxDecimals: 2, label: "Received amount" }),
         freight_charges: chargeSchema("Freight charges"),
         loading_charges: chargeSchema("Loading charges"),
+        labour_charges: chargeSchema("Labour charges"),
         discount: chargeSchema("Discount"),
         prepared_by: optionalText(),
         approved_by: optionalText(),

@@ -1,5 +1,6 @@
 import { Users, Wallet } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatAmount } from "@/lib/format";
 import { CustomerBillsModal } from "./customer-bills-modal";
@@ -15,7 +16,6 @@ type RpcRow = {
 };
 
 type PendingRow = RpcRow & { bill_nos: string[] };
-
 type SearchParams = { q?: string; pay?: string };
 
 function normalizePay(raw: string | undefined): "all" | "partial" | "unpaid" {
@@ -23,15 +23,9 @@ function normalizePay(raw: string | undefined): "all" | "partial" | "unpaid" {
     return "all";
 }
 
-export default async function PendingsPage({
-    searchParams,
-}: {
-    searchParams: Promise<SearchParams>;
-}) {
-    const raw = await searchParams;
-    const q = (raw.q ?? "").trim().toLowerCase();
-    const pay = normalizePay(raw.pay);
+// ----- Async streaming content -----
 
+async function PendingsContent({ q, pay }: { q: string; pay: "all" | "partial" | "unpaid" }) {
     const supabase = await createSupabaseServerClient();
     const [pendingRes, billNosRes] = await Promise.all([
         supabase.rpc("customer_pendings"),
@@ -41,26 +35,13 @@ export default async function PendingsPage({
             .neq("status", "paid")
             .order("bill_no", { ascending: true }),
     ]);
-    const { data, error } = pendingRes;
 
-    if (error) {
+    if (pendingRes.error) {
         return (
-            <section className="space-y-6">
-                <header>
-                    <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                        Receivables
-                    </h1>
-                    <p className="mt-2 text-base text-muted-foreground">
-                        Outstanding balances by customer.
-                    </p>
-                </header>
-                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
-                    <p className="text-sm font-medium text-destructive">
-                        Could not load receivables.
-                    </p>
-                    <p className="mt-1 text-xs text-destructive/80">{error.message}</p>
-                </div>
-            </section>
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+                <p className="text-sm font-medium text-destructive">Could not load receivables.</p>
+                <p className="mt-1 text-xs text-destructive/80">{pendingRes.error.message}</p>
+            </div>
         );
     }
 
@@ -71,39 +52,27 @@ export default async function PendingsPage({
         billNosByCustomer.set(b.customer_name, arr);
     }
 
-    const allRows: PendingRow[] = ((data ?? []) as RpcRow[]).map((r) => ({
+    const allRows: PendingRow[] = ((pendingRes.data ?? []) as RpcRow[]).map((r) => ({
         ...r,
         bill_nos: billNosByCustomer.get(r.customer_name) ?? [],
     }));
+
     const rows = allRows.filter((r) => {
         if (q) {
             const matchName = r.customer_name.toLowerCase().includes(q);
-            const matchBillNo = r.bill_nos.some((bn) =>
-                bn.toLowerCase().includes(q),
-            );
+            const matchBillNo = r.bill_nos.some((bn) => bn.toLowerCase().includes(q));
             if (!matchName && !matchBillNo) return false;
         }
         if (pay === "partial" && Number(r.received_amount) <= 0) return false;
         if (pay === "unpaid" && Number(r.received_amount) > 0) return false;
         return true;
     });
-    const totalPending = allRows.reduce(
-        (sum, r) => sum + Number(r.pending_amount),
-        0,
-    );
+
+    const totalPending = allRows.reduce((sum, r) => sum + Number(r.pending_amount), 0);
     const customerCount = allRows.length;
 
     return (
-        <section className="space-y-8">
-            <header>
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    Receivables
-                </h1>
-                <p className="mt-2 text-base text-muted-foreground">
-                    Outstanding balances grouped by customer.
-                </p>
-            </header>
-
+        <>
             <div className="grid gap-4 sm:grid-cols-2">
                 <StatCard
                     icon={<Users className="h-4 w-4" />}
@@ -121,9 +90,7 @@ export default async function PendingsPage({
             <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
                 <div className="flex flex-col gap-4 border-b border-border p-5">
                     <div>
-                        <h2 className="text-base font-semibold text-foreground">
-                            Customers
-                        </h2>
+                        <h2 className="text-base font-semibold text-foreground">Customers</h2>
                         <p className="text-xs text-muted-foreground">
                             {rows.length === allRows.length
                                 ? `${allRows.length.toLocaleString()} customer${allRows.length === 1 ? "" : "s"} with pending balances`
@@ -144,25 +111,13 @@ export default async function PendingsPage({
                         <table className="w-full min-w-[720px] text-sm">
                             <thead className="sticky top-0 z-10 text-left text-[11px] uppercase tracking-wider text-muted-foreground shadow-[inset_0_-1px_0_0_var(--color-border)] [&_th]:bg-[#f1f5f9]">
                                 <tr>
-                                    <th className="px-6 py-3.5 font-semibold">
-                                        Bill no.
-                                    </th>
+                                    <th className="px-6 py-3.5 font-semibold">Bill no.</th>
                                     <th className="px-6 py-3.5 font-semibold">Customer</th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Bills
-                                    </th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Total billed
-                                    </th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Received
-                                    </th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Pending
-                                    </th>
-                                    <th className="px-6 py-3.5 text-right font-semibold">
-                                        Actions
-                                    </th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Bills</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Total billed</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Received</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Pending</th>
+                                    <th className="px-6 py-3.5 text-right font-semibold">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -170,66 +125,63 @@ export default async function PendingsPage({
                                     const shown = r.bill_nos.slice(0, 3);
                                     const extra = r.bill_nos.length - shown.length;
                                     return (
-                                    <tr
-                                        key={r.customer_name}
-                                        className="transition hover:bg-muted/40"
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                {shown.map((bn) => (
-                                                    <span
-                                                        key={bn}
-                                                        className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground"
+                                        <tr key={r.customer_name} className="transition hover:bg-muted/40">
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    {shown.map((bn) => (
+                                                        <span
+                                                            key={bn}
+                                                            className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground"
+                                                        >
+                                                            {bn}
+                                                        </span>
+                                                    ))}
+                                                    {extra > 0 ? (
+                                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                                            +{extra} more
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 font-medium text-foreground">
+                                                {r.customer_name}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono tabular-nums">
+                                                {r.bill_count.toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono tabular-nums">
+                                                {formatAmount(r.total_amount)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono tabular-nums text-muted-foreground">
+                                                {formatAmount(r.received_amount)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono font-semibold tabular-nums text-amber-700">
+                                                {formatAmount(r.pending_amount)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <CustomerBillsModal
+                                                        customerName={r.customer_name}
+                                                        pendingAmount={formatAmount(r.pending_amount)}
+                                                    />
+                                                    <RecordCashModal
+                                                        customerName={r.customer_name}
+                                                        pendingAmount={r.pending_amount}
+                                                    />
+                                                    <Link
+                                                        href={`/print/ledger/${encodeURIComponent(r.customer_name)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
                                                     >
-                                                        {bn}
-                                                    </span>
-                                                ))}
-                                                {extra > 0 ? (
-                                                    <span className="text-[11px] font-medium text-muted-foreground">
-                                                        +{extra} more
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-foreground">
-                                            {r.customer_name}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-mono tabular-nums">
-                                            {r.bill_count.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-mono tabular-nums">
-                                            {formatAmount(r.total_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-mono tabular-nums text-muted-foreground">
-                                            {formatAmount(r.received_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-mono font-semibold tabular-nums text-amber-700">
-                                            {formatAmount(r.pending_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-3">
-                                                <CustomerBillsModal
-                                                    customerName={r.customer_name}
-                                                    pendingAmount={formatAmount(r.pending_amount)}
-                                                />
-                                                <RecordCashModal
-                                                    customerName={r.customer_name}
-                                                    pendingAmount={r.pending_amount}
-                                                />
-                                                <Link
-                                                    href={`/print/ledger/${encodeURIComponent(r.customer_name)}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition hover:opacity-70"
-                                                >
-                                                    <svg className="h-3.5 w-3.5" aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" />
-                                                    </svg>
-                                                    Ledger
-                                                </Link>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                                        <svg className="h-3.5 w-3.5" aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" />
+                                                        </svg>
+                                                        Ledger
+                                                    </Link>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     );
                                 })}
                             </tbody>
@@ -237,9 +189,66 @@ export default async function PendingsPage({
                     </div>
                 )}
             </div>
+        </>
+    );
+}
+
+// ----- Page -----
+
+export default async function PendingsPage({
+    searchParams,
+}: {
+    searchParams: Promise<SearchParams>;
+}) {
+    const raw = await searchParams;
+    const q = (raw.q ?? "").trim().toLowerCase();
+    const pay = normalizePay(raw.pay);
+
+    return (
+        <section className="space-y-8">
+            <header>
+                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Receivables</h1>
+                <p className="mt-2 text-base text-muted-foreground">
+                    Outstanding balances grouped by customer.
+                </p>
+            </header>
+
+            <Suspense fallback={<ContentSkeleton />}>
+                <PendingsContent q={q} pay={pay} />
+            </Suspense>
         </section>
     );
 }
+
+// ----- Skeleton -----
+
+function ContentSkeleton() {
+    return (
+        <>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="h-[88px] animate-pulse rounded-lg bg-muted" />
+                <div className="h-[88px] animate-pulse rounded-lg bg-muted" />
+            </div>
+            <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
+                <div className="border-b border-border p-5">
+                    <div className="h-5 w-24 animate-pulse rounded bg-muted" />
+                    <div className="mt-1.5 h-3 w-32 animate-pulse rounded bg-muted" />
+                </div>
+                <div className="divide-y divide-border">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-6 px-6 py-4">
+                            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                            <div className="ml-auto h-4 w-24 animate-pulse rounded bg-muted" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ----- Shared UI -----
 
 function StatCard({
     icon,
@@ -252,26 +261,17 @@ function StatCard({
     value: string;
     emphasis?: "warning";
 }) {
-    const bg =
-        emphasis === "warning"
-            ? "bg-amber-600 text-white"
-            : "bg-header text-header-foreground";
-    const labelColor =
-        emphasis === "warning" ? "text-white/80" : "text-header-foreground/70";
+    const bg = emphasis === "warning" ? "bg-amber-600 text-white" : "bg-header text-header-foreground";
+    const labelColor = emphasis === "warning" ? "text-white/80" : "text-header-foreground/70";
     return (
         <div className={`rounded-lg p-5 shadow-sm ${bg}`}>
             <div className={`flex items-center gap-2 ${labelColor}`}>
-                <span
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10"
-                    aria-hidden
-                >
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10" aria-hidden>
                     {icon}
                 </span>
                 <span className="text-sm font-medium">{label}</span>
             </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-                {value}
-            </p>
+            <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{value}</p>
         </div>
     );
 }

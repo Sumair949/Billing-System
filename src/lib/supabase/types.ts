@@ -15,6 +15,7 @@ export type Bill = {
     total_amount: string;
     freight_charges: string;
     loading_charges: string;
+    labour_charges: number;
     discount: string;
     prepared_by: string | null;
     approved_by: string | null;
@@ -172,6 +173,29 @@ export type Database = {
                 Update: Partial<CashPaymentInsert>;
                 Relationships: [];
             };
+            shop_workers: {
+                Row: {
+                    id: string;
+                    owner_id: string;
+                    worker_user_id: string;
+                    display_name: string;
+                    is_active: boolean;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    owner_id: string;
+                    worker_user_id: string;
+                    display_name: string;
+                    is_active?: boolean;
+                    created_at?: string;
+                };
+                Update: Partial<{
+                    display_name: string;
+                    is_active: boolean;
+                }>;
+                Relationships: [];
+            };
         };
         Views: EmptyRecord;
         Functions: {
@@ -212,6 +236,40 @@ export type Database = {
                     paid_amount: string;
                     payable_amount: string;
                 }>;
+            };
+            create_bill_with_items: {
+                Args: {
+                    p_user_id: string;
+                    p_bill: Record<string, unknown>;
+                    p_items: Array<Record<string, unknown>>;
+                };
+                Returns: string;
+            };
+            upsert_bill_with_items: {
+                Args: {
+                    p_bill_id: string;
+                    p_bill: Record<string, unknown>;
+                    p_items: Array<Record<string, unknown>>;
+                };
+                Returns: void;
+            };
+            apply_cash_receipt: {
+                Args: {
+                    p_customer_name: string;
+                    p_amount: number;
+                    p_receipt_date: string;
+                    p_notes?: string | null;
+                };
+                Returns: void;
+            };
+            apply_cash_payment: {
+                Args: {
+                    p_supplier_name: string;
+                    p_amount: number;
+                    p_payment_date: string;
+                    p_notes?: string | null;
+                };
+                Returns: void;
             };
         };
         Enums: EmptyRecord;

@@ -18,7 +18,7 @@ export default async function EditBillPage({
         supabase
             .from("bills")
             .select(
-                "id, bill_no, customer_name, customer_phone, address, email, ntn, stn, bill_date, total_amount, received_amount, freight_charges, loading_charges, discount, prepared_by, approved_by",
+                "id, bill_no, customer_name, customer_phone, address, email, ntn, stn, bill_date, total_amount, received_amount, freight_charges, loading_charges, labour_charges, discount, prepared_by, approved_by",
             )
             .eq("id", id)
             .maybeSingle(),
@@ -82,6 +82,7 @@ export default async function EditBillPage({
                     received_amount: String(bill.received_amount),
                     freight_charges: String(bill.freight_charges ?? "0"),
                     loading_charges: String(bill.loading_charges ?? "0"),
+                    labour_charges: String(bill.labour_charges ?? "0"),
                     discount: String(bill.discount ?? "0"),
                     prepared_by: bill.prepared_by ?? "",
                     approved_by: bill.approved_by ?? "",

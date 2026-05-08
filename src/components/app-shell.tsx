@@ -7,6 +7,7 @@ import {
     ShieldCheck,
     ShoppingCart,
     User as UserIcon,
+    Users,
     Wallet,
 } from "lucide-react";
 import Link from "next/link";
@@ -131,6 +132,15 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                                         icon={<CreditCard className="h-5 w-5" />}
                                     />
                                 </li>
+                                {!admin ? (
+                                    <li>
+                                        <NavLink
+                                            href="/settings/workers"
+                                            label="Workers"
+                                            icon={<Users className="h-5 w-5" />}
+                                        />
+                                    </li>
+                                ) : null}
                                 {admin ? (
                                     <li>
                                         <NavLink

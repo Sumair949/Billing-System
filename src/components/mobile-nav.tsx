@@ -7,6 +7,7 @@ import {
     Receipt,
     ShieldCheck,
     ShoppingCart,
+    Users,
     Wallet,
     X,
 } from "lucide-react";
@@ -103,6 +104,15 @@ export function MobileNav({ admin }: { admin: boolean }) {
                                     icon={<CreditCard className="h-5 w-5" />}
                                 />
                             </li>
+                            {!admin ? (
+                                <li>
+                                    <NavLink
+                                        href="/settings/workers"
+                                        label="Workers"
+                                        icon={<Users className="h-5 w-5" />}
+                                    />
+                                </li>
+                            ) : null}
                             {admin ? (
                                 <li>
                                     <NavLink

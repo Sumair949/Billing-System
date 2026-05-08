@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { CURRENCY_SYMBOL, formatAmountPlain, formatDate } from "@/lib/format";
-import { readShopInfo } from "@/lib/shop";
+import { fetchShopInfo } from "@/lib/shop";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PrintActions } from "./print-actions";
 
@@ -25,7 +25,7 @@ export default async function PrintBillPage({
         supabase
             .from("bills")
             .select(
-                "id, bill_no, customer_name, customer_phone, address, email, ntn, stn, bill_date, total_amount, received_amount, freight_charges, loading_charges, discount, prepared_by, approved_by",
+                "id, bill_no, customer_name, customer_phone, address, email, ntn, stn, bill_date, total_amount, received_amount, freight_charges, loading_charges, labour_charges, discount, prepared_by, approved_by",
             )
             .eq("id", id)
             .maybeSingle(),
@@ -41,7 +41,7 @@ export default async function PrintBillPage({
 
     const bill = billRes.data;
     const items = (itemsRes.data ?? []) as ItemRow[];
-    const shop = readShopInfo(userRes.data.user?.user_metadata);
+    const shop = await fetchShopInfo(userRes.data.user ?? null);
     const pending = Math.max(
         0,
         Number(bill.total_amount) - Number(bill.received_amount),
@@ -49,9 +49,10 @@ export default async function PrintBillPage({
 
     const freightLoadingCharges =
         Number(bill.freight_charges ?? 0) + Number(bill.loading_charges ?? 0);
+    const labourChargesAmt = Number(bill.labour_charges ?? 0);
     const discountAmt = Number(bill.discount ?? 0);
     const subtotal =
-        Number(bill.total_amount) - freightLoadingCharges + discountAmt;
+        Number(bill.total_amount) - freightLoadingCharges - labourChargesAmt + discountAmt;
 
     return (
         <div className="min-h-screen bg-gray-100 py-8 print:bg-white print:py-0">
@@ -170,7 +171,7 @@ export default async function PrintBillPage({
                         {/* Summary box */}
                         <section className="mt-3 flex justify-end">
                             <div className="w-full max-w-xs rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs print:border-gray-400 print:bg-white">
-                                {(freightLoadingCharges > 0 || discountAmt > 0) ? (
+                                {(freightLoadingCharges > 0 || labourChargesAmt > 0 || discountAmt > 0) ? (
                                     <div className="flex justify-between border-b border-gray-200 pb-2 mb-2 print:border-gray-400">
                                         <span className="text-gray-500 print:text-gray-800">Subtotal</span>
                                         <span className="font-mono print:text-black">{CURRENCY_SYMBOL} {formatAmountPlain(subtotal)}</span>
@@ -180,6 +181,12 @@ export default async function PrintBillPage({
                                     <div className="flex justify-between py-0.5">
                                         <span className="text-gray-500 print:text-gray-800">Freight &amp; Loading</span>
                                         <span className="font-mono print:text-black">{CURRENCY_SYMBOL} {formatAmountPlain(freightLoadingCharges)}</span>
+                                    </div>
+                                ) : null}
+                                {labourChargesAmt > 0 ? (
+                                    <div className="flex justify-between py-0.5">
+                                        <span className="text-gray-500 print:text-gray-800">Labour</span>
+                                        <span className="font-mono print:text-black">{CURRENCY_SYMBOL} {formatAmountPlain(labourChargesAmt)}</span>
                                     </div>
                                 ) : null}
                                 {discountAmt > 0 ? (
@@ -217,21 +224,19 @@ export default async function PrintBillPage({
                         <div className="flex-1 py-4" />
 
                         {/* Signatures */}
-                        <section className="grid grid-cols-2 gap-8">
-                            <div>
-                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Prepared by</p>
-                                {bill.prepared_by ? (
-                                    <p className="mt-0.5 text-[11px] font-medium text-gray-700 print:text-black">{bill.prepared_by}</p>
-                                ) : null}
-                            </div>
-                            <div>
-                                <div className="mb-1 border-b-2 border-dashed border-gray-300 print:border-gray-600 print:border-solid" />
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 print:text-gray-700">Approved by</p>
-                                {bill.approved_by ? (
-                                    <p className="mt-0.5 text-[11px] font-medium text-gray-700 print:text-black">{bill.approved_by}</p>
-                                ) : null}
-                            </div>
+                        <section className="flex justify-between text-[11px] text-gray-600 print:text-gray-900">
+                            <p>
+                                <span className="font-semibold text-gray-700 print:text-black">Prepared By:</span>
+                                {bill.prepared_by
+                                    ? ` ${bill.prepared_by}`
+                                    : <span className="inline-block w-32">&nbsp;</span>}
+                            </p>
+                            <p>
+                                <span className="font-semibold text-gray-700 print:text-black">Approved By:</span>
+                                {bill.approved_by
+                                    ? ` ${bill.approved_by}`
+                                    : <span className="inline-block w-32">&nbsp;</span>}
+                            </p>
                         </section>
 
                         <footer className="mt-4">

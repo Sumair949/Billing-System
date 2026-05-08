@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { purchaseSchema } from "@/lib/validation/purchase";
 
@@ -83,6 +84,8 @@ export async function createPurchaseAction(
     }
 
     const { supabase, user } = await requireUser();
+    if (checkRateLimit(user.id, "create_purchase", 20))
+        return { error: "Too many requests. Please wait a moment and try again." };
 
     const { data: purchase, error: purchaseErr } = await supabase
         .from("purchases")

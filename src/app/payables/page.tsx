@@ -1,5 +1,6 @@
 import { Building2, CreditCard } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatAmount } from "@/lib/format";
 import { SupplierPurchasesModal } from "./supplier-purchases-modal";
@@ -15,7 +16,6 @@ type RpcRow = {
 };
 
 type PayableRow = RpcRow & { purchase_nos: string[] };
-
 type SearchParams = { q?: string; pay?: string };
 
 function normalizePay(raw: string | undefined): "all" | "partial" | "unpaid" {
@@ -23,15 +23,9 @@ function normalizePay(raw: string | undefined): "all" | "partial" | "unpaid" {
     return "all";
 }
 
-export default async function PayablesPage({
-    searchParams,
-}: {
-    searchParams: Promise<SearchParams>;
-}) {
-    const raw = await searchParams;
-    const q = (raw.q ?? "").trim().toLowerCase();
-    const pay = normalizePay(raw.pay);
+// ----- Async streaming content -----
 
+async function PayablesContent({ q, pay }: { q: string; pay: "all" | "partial" | "unpaid" }) {
     const supabase = await createSupabaseServerClient();
     const [payableRes, poNosRes] = await Promise.all([
         supabase.rpc("supplier_payables"),
@@ -41,28 +35,13 @@ export default async function PayablesPage({
             .neq("status", "paid")
             .order("purchase_no", { ascending: true }),
     ]);
-    const { data, error } = payableRes;
 
-    if (error) {
+    if (payableRes.error) {
         return (
-            <section className="space-y-6">
-                <header>
-                    <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                        Payables
-                    </h1>
-                    <p className="mt-2 text-base text-muted-foreground">
-                        Outstanding supplier balances.
-                    </p>
-                </header>
-                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
-                    <p className="text-sm font-medium text-destructive">
-                        Could not load payables.
-                    </p>
-                    <p className="mt-1 text-xs text-destructive/80">
-                        {error.message}
-                    </p>
-                </div>
-            </section>
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+                <p className="text-sm font-medium text-destructive">Could not load payables.</p>
+                <p className="mt-1 text-xs text-destructive/80">{payableRes.error.message}</p>
+            </div>
         );
     }
 
@@ -73,7 +52,7 @@ export default async function PayablesPage({
         poNosBySupplier.set(p.supplier_name, arr);
     }
 
-    const allRows: PayableRow[] = ((data ?? []) as RpcRow[]).map((r) => ({
+    const allRows: PayableRow[] = ((payableRes.data ?? []) as RpcRow[]).map((r) => ({
         ...r,
         purchase_nos: poNosBySupplier.get(r.supplier_name) ?? [],
     }));
@@ -81,9 +60,7 @@ export default async function PayablesPage({
     const rows = allRows.filter((r) => {
         if (q) {
             const matchName = r.supplier_name.toLowerCase().includes(q);
-            const matchPoNo = r.purchase_nos.some((pn) =>
-                pn.toLowerCase().includes(q),
-            );
+            const matchPoNo = r.purchase_nos.some((pn) => pn.toLowerCase().includes(q));
             if (!matchName && !matchPoNo) return false;
         }
         if (pay === "partial" && Number(r.paid_amount) <= 0) return false;
@@ -91,23 +68,11 @@ export default async function PayablesPage({
         return true;
     });
 
-    const totalPayable = allRows.reduce(
-        (sum, r) => sum + Number(r.payable_amount),
-        0,
-    );
+    const totalPayable = allRows.reduce((sum, r) => sum + Number(r.payable_amount), 0);
     const supplierCount = allRows.length;
 
     return (
-        <section className="space-y-8">
-            <header>
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    Payables
-                </h1>
-                <p className="mt-2 text-base text-muted-foreground">
-                    Outstanding balances grouped by supplier.
-                </p>
-            </header>
-
+        <>
             <div className="grid gap-4 sm:grid-cols-2">
                 <StatCard
                     icon={<Building2 className="h-4 w-4" />}
@@ -125,9 +90,7 @@ export default async function PayablesPage({
             <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
                 <div className="flex flex-col gap-4 border-b border-border p-5">
                     <div>
-                        <h2 className="text-base font-semibold text-foreground">
-                            Suppliers
-                        </h2>
+                        <h2 className="text-base font-semibold text-foreground">Suppliers</h2>
                         <p className="text-xs text-muted-foreground">
                             {rows.length === allRows.length
                                 ? `${allRows.length.toLocaleString()} supplier${allRows.length === 1 ? "" : "s"} with payable balances`
@@ -162,10 +125,7 @@ export default async function PayablesPage({
                                     const shown = r.purchase_nos.slice(0, 3);
                                     const extra = r.purchase_nos.length - shown.length;
                                     return (
-                                        <tr
-                                            key={r.supplier_name}
-                                            className="transition hover:bg-muted/40"
-                                        >
+                                        <tr key={r.supplier_name} className="transition hover:bg-muted/40">
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                     {shown.map((pn) => (
@@ -229,9 +189,66 @@ export default async function PayablesPage({
                     </div>
                 )}
             </div>
+        </>
+    );
+}
+
+// ----- Page -----
+
+export default async function PayablesPage({
+    searchParams,
+}: {
+    searchParams: Promise<SearchParams>;
+}) {
+    const raw = await searchParams;
+    const q = (raw.q ?? "").trim().toLowerCase();
+    const pay = normalizePay(raw.pay);
+
+    return (
+        <section className="space-y-8">
+            <header>
+                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Payables</h1>
+                <p className="mt-2 text-base text-muted-foreground">
+                    Outstanding balances grouped by supplier.
+                </p>
+            </header>
+
+            <Suspense fallback={<ContentSkeleton />}>
+                <PayablesContent q={q} pay={pay} />
+            </Suspense>
         </section>
     );
 }
+
+// ----- Skeleton -----
+
+function ContentSkeleton() {
+    return (
+        <>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="h-[88px] animate-pulse rounded-lg bg-muted" />
+                <div className="h-[88px] animate-pulse rounded-lg bg-muted" />
+            </div>
+            <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-border">
+                <div className="border-b border-border p-5">
+                    <div className="h-5 w-20 animate-pulse rounded bg-muted" />
+                    <div className="mt-1.5 h-3 w-32 animate-pulse rounded bg-muted" />
+                </div>
+                <div className="divide-y divide-border">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-6 px-6 py-4">
+                            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                            <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+                            <div className="ml-auto h-4 w-24 animate-pulse rounded bg-muted" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ----- Shared UI -----
 
 function StatCard({
     icon,
@@ -244,12 +261,8 @@ function StatCard({
     value: string;
     emphasis?: "warning";
 }) {
-    const bg =
-        emphasis === "warning"
-            ? "bg-amber-600 text-white"
-            : "bg-header text-header-foreground";
-    const labelColor =
-        emphasis === "warning" ? "text-white/80" : "text-header-foreground/70";
+    const bg = emphasis === "warning" ? "bg-amber-600 text-white" : "bg-header text-header-foreground";
+    const labelColor = emphasis === "warning" ? "text-white/80" : "text-header-foreground/70";
     return (
         <div className={`rounded-lg p-5 shadow-sm ${bg}`}>
             <div className={`flex items-center gap-2 ${labelColor}`}>
@@ -258,9 +271,7 @@ function StatCard({
                 </span>
                 <span className="text-sm font-medium">{label}</span>
             </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-                {value}
-            </p>
+            <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{value}</p>
         </div>
     );
 }

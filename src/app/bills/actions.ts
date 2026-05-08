@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { billSchema } from "@/lib/validation/bill";
 
@@ -20,6 +21,7 @@ export type BillFormState = {
             | "total_amount"
             | "freight_charges"
             | "loading_charges"
+            | "labour_charges"
             | "discount"
             | "prepared_by"
             | "approved_by"
@@ -52,6 +54,7 @@ function parseBillFormData(formData: FormData) {
         received_amount: formData.get("received_amount"),
         freight_charges: formData.get("freight_charges"),
         loading_charges: formData.get("loading_charges"),
+        labour_charges: formData.get("labour_charges"),
         discount: formData.get("discount"),
         prepared_by: formData.get("prepared_by"),
         approved_by: formData.get("approved_by"),
@@ -84,6 +87,34 @@ async function requireUser() {
     return { supabase, user };
 }
 
+function billRpcPayload(d: ReturnType<typeof parseBillFormData> & { success: true }) {
+    return {
+        p_bill: {
+            customer_name:   d.data.customer_name,
+            customer_phone:  d.data.customer_phone  ?? "",
+            address:         d.data.address         ?? "",
+            email:           d.data.email           ?? "",
+            ntn:             d.data.ntn             ?? "",
+            stn:             d.data.stn             ?? "",
+            bill_date:       d.data.bill_date,
+            total_amount:    d.data.total_amount,
+            received_amount: d.data.received_amount,
+            freight_charges: d.data.freight_charges,
+            loading_charges: d.data.loading_charges,
+            labour_charges:  d.data.labour_charges,
+            discount:        d.data.discount,
+            prepared_by:     d.data.prepared_by     ?? "",
+            approved_by:     d.data.approved_by     ?? "",
+        },
+        p_items: d.data.items.map((item) => ({
+            description: item.description,
+            quantity:    item.quantity ?? null,
+            weight:      item.weight   ?? null,
+            rate:        item.rate,
+        })),
+    };
+}
+
 export async function createBillAction(
     _prev: BillFormState,
     formData: FormData,
@@ -94,57 +125,26 @@ export async function createBillAction(
     }
 
     const { supabase, user } = await requireUser();
+    if (checkRateLimit(user.id, "create_bill", 20))
+        return { error: "Too many requests. Please wait a moment and try again." };
+    const { p_bill, p_items } = billRpcPayload(parsed);
 
-    const { data: bill, error: billErr } = await supabase
-        .from("bills")
-        .insert({
-            user_id: user.id,
-            customer_name: parsed.data.customer_name,
-            customer_phone: parsed.data.customer_phone ?? null,
-            address: parsed.data.address ?? null,
-            email: parsed.data.email ?? null,
-            ntn: parsed.data.ntn ?? null,
-            stn: parsed.data.stn ?? null,
-            bill_date: parsed.data.bill_date,
-            total_amount: parsed.data.total_amount,
-            received_amount: parsed.data.received_amount,
-            freight_charges: parsed.data.freight_charges,
-            loading_charges: parsed.data.loading_charges,
-            discount: parsed.data.discount,
-            prepared_by: parsed.data.prepared_by ?? null,
-            approved_by: parsed.data.approved_by ?? null,
-        })
-        .select("id")
-        .single();
+    const { data: billId, error } = await supabase.rpc("create_bill_with_items", {
+        p_user_id: user.id,
+        p_bill,
+        p_items,
+    });
 
-    if (billErr || !bill) {
-        console.error("[createBillAction] insert bill failed:", billErr);
+    if (error || !billId) {
+        console.error("[createBillAction] rpc failed:", error);
         return { error: "Could not save the bill. Please try again." };
-    }
-
-    const { error: itemsErr } = await supabase.from("bill_items").insert(
-        parsed.data.items.map((item, i) => ({
-            bill_id: bill.id,
-            user_id: user.id,
-            sr_no: i + 1,
-            description: item.description,
-            quantity: item.quantity ?? null,
-            weight: item.weight ?? null,
-            rate: item.rate,
-        })),
-    );
-
-    if (itemsErr) {
-        console.error("[createBillAction] insert items failed:", itemsErr);
-        await supabase.from("bills").delete().eq("id", bill.id);
-        return { error: "Could not save the bill's items. Please try again." };
     }
 
     revalidatePath("/");
     revalidatePath("/bills");
     revalidatePath("/pendings");
     if (formData.get("action") === "save-print") {
-        redirect(`/print/bills/${bill.id}`);
+        redirect(`/print/bills/${billId}`);
     }
     redirect("/?flash=bill-created");
 }
@@ -159,58 +159,18 @@ export async function updateBillAction(
         return { fieldErrors: fieldErrorsFromZod(parsed.error.issues) };
     }
 
-    const { supabase, user } = await requireUser();
+    const { supabase } = await requireUser();
+    const { p_bill, p_items } = billRpcPayload(parsed);
 
-    const { error: billErr } = await supabase
-        .from("bills")
-        .update({
-            customer_name: parsed.data.customer_name,
-            customer_phone: parsed.data.customer_phone ?? null,
-            address: parsed.data.address ?? null,
-            email: parsed.data.email ?? null,
-            ntn: parsed.data.ntn ?? null,
-            stn: parsed.data.stn ?? null,
-            bill_date: parsed.data.bill_date,
-            total_amount: parsed.data.total_amount,
-            received_amount: parsed.data.received_amount,
-            freight_charges: parsed.data.freight_charges,
-            loading_charges: parsed.data.loading_charges,
-            discount: parsed.data.discount,
-            prepared_by: parsed.data.prepared_by ?? null,
-            approved_by: parsed.data.approved_by ?? null,
-        })
-        .eq("id", id);
+    const { error } = await supabase.rpc("upsert_bill_with_items", {
+        p_bill_id: id,
+        p_bill,
+        p_items,
+    });
 
-    if (billErr) {
-        console.error("[updateBillAction] update bill failed:", billErr);
+    if (error) {
+        console.error("[updateBillAction] rpc failed:", error);
         return { error: "Could not update the bill. Please try again." };
-    }
-
-    const { error: deleteErr } = await supabase
-        .from("bill_items")
-        .delete()
-        .eq("bill_id", id);
-
-    if (deleteErr) {
-        console.error("[updateBillAction] delete items failed:", deleteErr);
-        return { error: "Could not update the bill's items. Please try again." };
-    }
-
-    const { error: insertErr } = await supabase.from("bill_items").insert(
-        parsed.data.items.map((item, i) => ({
-            bill_id: id,
-            user_id: user.id,
-            sr_no: i + 1,
-            description: item.description,
-            quantity: item.quantity ?? null,
-            weight: item.weight ?? null,
-            rate: item.rate,
-        })),
-    );
-
-    if (insertErr) {
-        console.error("[updateBillAction] insert items failed:", insertErr);
-        return { error: "Could not update the bill's items. Please try again." };
     }
 
     revalidatePath("/");
